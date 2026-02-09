@@ -1,34 +1,36 @@
 import re
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 import requests
 from bs4 import BeautifulSoup
 from flask_cors import CORS
+import os
 
-app = Flask(__name__)
+# Render için gerekli ayar (Siteyi buradan sunacak)
+app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# HEDEF
 HEDEF_URL = "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138"
 
-# Riot Sürüm Kontrolü
+# --- 1. SİTEYİ AÇAN KOD ---
+@app.route('/')
+def serve_index():
+    return send_from_directory('.', 'index.html')
+
+# --- 2. RAGNAR V33 (ZAMAN YOLCUSU) ---
 def get_latest_ddragon_version():
     try:
-        # Riot'un sunucusundan en son versiyonu çek (Örn: 16.3.1)
+        # Riot'tan en güncel sürümü çek (16.3.1 gibi)
         response = requests.get("https://ddragon.leagueoflegends.com/api/versions.json", timeout=5)
         if response.status_code == 200:
             versions = response.json()
-            return versions[0] # Listenin başındaki en güncelidir
-    except Exception as e:
-        print(f"Versiyon çekilemedi, varsayılan kullanılıyor: {e}")
-    return "14.3.1" # Hata olursa eskisine dön
+            return versions[0]
+    except: pass
+    return "14.3.1" # Yedek
 
 @app.route('/api/get-ragnar', methods=['GET'])
 def get_ragnar_data():
-    # 1. GÜNCEL SÜRÜMÜ BELİRLE
     current_version = get_latest_ddragon_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{current_version}/img"
-    
-    print(f"\n--- V33 - ZAMAN YOLCUSU (Versiyon: {current_version}) ---")
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
@@ -39,12 +41,11 @@ def get_ragnar_data():
         response = requests.get(HEDEF_URL, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # --- 2. LEVEL BİLGİSİ ---
+        # LEVEL / RANK
         rank_text = "Level Bilgisi Yok"
         try:
             banner_sub = soup.find("div", class_="bannerSubtitle")
-            if banner_sub:
-                rank_text = banner_sub.text.strip()
+            if banner_sub: rank_text = banner_sub.text.strip()
             else:
                 tier = soup.find("div", class_="league-tier")
                 if tier: rank_text = tier.text.strip()
@@ -57,7 +58,7 @@ def get_ragnar_data():
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # --- 3. MAÇLARI ÇEK ---
+        # MAÇLAR
         matches_info = []
         all_rows = soup.find_all("tr")
         
@@ -66,7 +67,7 @@ def get_ragnar_data():
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # --- A. ŞAMPİYON ---
+                # ŞAMPİYON
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -96,35 +97,27 @@ def get_ragnar_data():
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # --- B. İTEMLER (GÜNCEL SÜRÜMLE) ---
+                # İTEMLER (V33 MANTIĞI - Sen bunu sevmiştin)
                 items = []
                 img_tags = row.find_all("img")
                 
                 for img in img_tags:
                     img_str = str(img)
                     
-                    # Şampiyon, Rün, Büyü vb. ele
                     if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str:
                         continue
                     
-                    # 4 Haneli Sayıları Bul
                     candidates = re.findall(r"(\d{4})", img_str)
                     
                     for num in candidates:
                         val = int(num)
+                        # V33 Filtreleri
+                        if 2020 <= val <= 2030: continue # Yılları at
+                        if 5000 <= val < 6000: continue # Rünleri at
                         
-                        # FİLTRE:
-                        # 2020-2030 arasını AT (Yıl)
-                        if 2020 <= val <= 2030: continue
-                        # 5000-5900 arasını AT (Stat Shards)
-                        if 5000 <= val < 6000: continue
-                        
-                        # Kalan 1000-8000 arası GERÇEK ITEMDIR
                         if 1000 <= val <= 8000:
-                            # Sürüm güncel olduğu için artık resim kırık çıkmayacak!
                             items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                # Tekrarları temizle
                 clean_items = []
                 seen = set()
                 for x in items:
@@ -133,7 +126,6 @@ def get_ragnar_data():
                         seen.add(x)
                 clean_items = clean_items[:7]
 
-                # --- C. SONUÇ VE KDA ---
                 kda_text = kda_div.text.strip()
                 result = "lose"
                 if "Victory" in row.text or "Zafer" in row.text: result = "win"
@@ -150,10 +142,6 @@ def get_ragnar_data():
 
             except: continue
         
-        print(f"BİLGİ: {rank_text}")
-        if matches_info:
-            print(f"İlk Maç Item ID'leri: {[x.split('/')[-1] for x in matches_info[0]['items']]}")
-
         return jsonify({
             "summoner": "Ragnar Lothbrok #0138",
             "rank": rank_text,
@@ -162,9 +150,8 @@ def get_ragnar_data():
         })
 
     except Exception as e:
-        print("Hata:", e)
         return jsonify({"error": str(e)})
 
 if __name__ == '__main__':
-    print("ABT BUILDS (V33 - ZAMAN YOLCUSU) Başlatıldı...")
-    app.run(debug=True, port=5000)
+    # Render'da çalışması için host='0.0.0.0' şart
+    app.run(host='0.0.0.0', port=5000)
