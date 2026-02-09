@@ -5,7 +5,7 @@ const rankDisplay = document.getElementById('rank-display');
 
 async function fetchMatches() {
     try {
-        const response = await fetch('http://127.0.0.1:5000/api/get-ragnar');
+        const response = await fetch('/api/get-ragnar');
         const data = await response.json();
 
         if (data.summoner) summonerName.innerText = data.summoner;
@@ -70,5 +70,6 @@ function renderMatches(matches) {
         container.appendChild(card);
     });
 }
+
 
 fetchMatches();
