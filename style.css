@@ -1,0 +1,110 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Roboto', sans-serif;
+    color: white;
+    background-image: url('ragnar.jpg'); 
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    min-height: 100vh;
+}
+
+.overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: -1;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    border-bottom: 2px solid #c4b998;
+    padding-bottom: 20px;
+}
+
+h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
+
+.profile-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+}
+
+.profile-icon {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    border: 3px solid #00bba3;
+}
+
+.highlight { color: #00bba3; font-weight: bold; font-size: 1.2rem; }
+.rank-text { font-size: 1.1rem; color: #ddd; margin-top: 5px; }
+
+/* MAÇ KARTLARI */
+.match-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(30, 30, 35, 0.95);
+    margin-bottom: 12px;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 6px solid gray;
+}
+
+.match-card.win { border-left-color: #5383e8; background: linear-gradient(90deg, rgba(30,50,90,0.8), rgba(25,25,30,0.95)); }
+.match-card.lose { border-left-color: #e84057; background: linear-gradient(90deg, rgba(90,30,40,0.8), rgba(25,25,30,0.95)); }
+
+.champ-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 200px;
+}
+
+.champ-img {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 2px solid #444;
+}
+
+.champ-name { font-size: 1.1rem; font-weight: bold; display: block; }
+.game-mode { font-size: 0.8rem; color: #aaa; }
+
+/* İTEMLER IZGARASI */
+.items-grid {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 260px; /* Genişliği sabitledik */
+}
+
+/* Kutu Stili */
+.item-slot {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.4); /* Boş kutu rengi */
+    border: 1px solid #444;
+    overflow: hidden;
+}
+
+.item-img {
+    width: 100%;
+    height: 100%;
+}
+
+.stats { text-align: right; width: 100px; }
+.result-text { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; }
+.kda-text { font-size: 1rem; color: #ccc; }
