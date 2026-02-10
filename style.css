@@ -86,8 +86,8 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
-    justify-content: center;
-    width: 260px; /* Genişliği sabitledik */
+    justify-content: flex-start; /* ÖNEMLİ: İtemleri sola yaslar, böylece boşluk kapanır */
+    width: 260px;
 }
 
 /* Kutu Stili */
@@ -107,4 +107,5 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
 
 .stats { text-align: right; width: 100px; }
 .result-text { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; }
+
 .kda-text { font-size: 1rem; color: #ccc; }
