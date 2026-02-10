@@ -34,12 +34,12 @@ function renderMatches(matches) {
         // İtemleri oluştur
         let itemsHtml = '';
         
-        // Gelen itemler
+       // Gelen itemler
         match.items.forEach(itemUrl => {
-            // ÖNEMLİ: onerror olayı, resim yüklenemezse onu boş kutuya çevirir.
+            // DEĞİŞİKLİK BURADA: Resim hataya düşerse (onerror), .remove() komutuyla o kutuyu komple siliyoruz.
             itemsHtml += `
                 <div class="item-slot">
-                    <img src="${itemUrl}" class="item-img" alt="Item" onerror="this.style.display='none'; this.parentElement.classList.add('broken-image');">
+                    <img src="${itemUrl}" class="item-img" alt="Item" onerror="this.closest('.item-slot').remove()">
                 </div>
             `;
         });
@@ -73,3 +73,4 @@ function renderMatches(matches) {
 
 
 fetchMatches();
+
