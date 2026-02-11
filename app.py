@@ -7,7 +7,7 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# --- TAKİP EDİLECEK HESAPLAR LİSTESİ ---
+# Takip Edilecek Linkler
 URL_LISTESI = [
     "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138",
     "https://www.leagueofgraphs.com/summoner/tr/D%C3%96L+VE+OKS%C4%B0JEN-011"
@@ -24,7 +24,6 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
-# --- TEK BİR KULLANICIYI ÇEKEN FONKSİYON ---
 def scrape_summoner(url):
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
@@ -38,12 +37,10 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # 1. İSİM VE RANK
-        summoner_name = "Bilinmeyen Sihirdar"
+        # İsim ve Rank
+        summoner_name = "Sihirdar"
         try:
-            # Sayfa başlığından ismi çek (Daha garanti)
             title = soup.find("title").text
-            # Örn: "Ragnar Lothbrok - League of Legends..." -> Sadece ismi al
             summoner_name = title.split("(")[0].strip().replace(" - League of Legends", "")
         except: pass
 
@@ -63,7 +60,7 @@ def scrape_summoner(url):
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # 2. MAÇLAR
+        # MAÇLARI ÇEK
         matches_info = []
         all_rows = soup.find_all("tr")
         
@@ -72,7 +69,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # ŞAMPİYON
+                # Şampiyon Bulma
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -92,37 +89,52 @@ def scrape_summoner(url):
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
                 
-                if champ_key == "Poro":
-                    imgs = row.find_all("img")
-                    for img in imgs:
-                        alt = img.get("alt", "")
-                        if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold"]:
-                            champ_key = alt.replace(" ", "").replace("'", "").replace(".", "")
-                            break
-                
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # İTEMLER
+                # --- V38: KESKİN NİŞANCI İTEM BULUCU ---
                 items = []
-                img_tags = row.find_all("img")
-                for img in img_tags:
-                    img_str = str(img)
-                    if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str: continue
-                    candidates = re.findall(r"(\d{4})", img_str)
-                    for num in candidates:
-                        val = int(num)
-                        if 1000 <= val <= 8000:
-                            if 5000 <= val < 6000: continue
-                            if 2020 <= val <= 2030: continue
-                            items.append(f"{RIOT_CDN}/item/{val}.png")
+                row_html = str(row)
+                
+                # Regex sadece KESİN item kalıplarına bakar:
+                # 1. item-icon-XXXX
+                # 2. data-item-id="XXXX"
+                # 3. /item/XXXX.png
+                
+                matches = re.findall(r"item-icon-(\d+)|data-item-id=\"(\d+)\"|/item/(\d+)\.png", row_html)
+                
+                found_ids = []
+                for m in matches:
+                    # Regex grubu hangisini bulduysa onu al (boş olmayan)
+                    for val in m:
+                        if val:
+                            found_ids.append(int(val))
 
+                # Filtreleme
                 clean_items = []
+                # Duplicate kontrolü yapmıyoruz (Seen set yok), çünkü adam belki 2 tane aynı kılıcı aldı.
+                # Sadece ardışık tekrarları ve 0 itemleri önleyelim.
+                
+                for val in found_ids:
+                    if 1000 <= val <= 8000: # Sadece gerçek item aralığı
+                        if 5000 <= val < 6000: continue # Rünleri at
+                        if 2020 <= val <= 2030: continue # Yılları at
+                        
+                        # Riot Linkini oluştur
+                        full_url = f"{RIOT_CDN}/item/{val}.png"
+                        clean_items.append(full_url)
+
+                # Listeyi tekilleştir (ama sırayı bozma) -> Aynı itemden 2 tane varsa kalsın mı? 
+                # League of graphs bazen tooltip için aynı id'yi 2 kere yazar. 
+                # Basit bir "Unique" filtresi uygulayalım:
+                unique_items = []
                 seen = set()
-                for x in items:
-                    if x not in seen:
-                        clean_items.append(x)
-                        seen.add(x)
-                clean_items = clean_items[:7]
+                for item in clean_items:
+                    if item not in seen:
+                        unique_items.append(item)
+                        seen.add(item)
+                
+                # Maksimum 7 item
+                final_items = unique_items[:7]
 
                 kda_text = kda_div.text.strip()
                 result = "lose"
@@ -133,7 +145,7 @@ def scrape_summoner(url):
                     "result": result,
                     "kda": kda_text,
                     "img": final_champ_img,
-                    "items": clean_items
+                    "items": final_items
                 })
                 if len(matches_info) >= 5: break
             except: continue
@@ -148,15 +160,12 @@ def scrape_summoner(url):
     except Exception as e:
         return {"error": str(e), "summoner": "Hata", "matches": []}
 
-# --- API: TÜM KULLANICILARI DÖNDÜR ---
 @app.route('/api/get-ragnar', methods=['GET'])
 def get_all_users():
     all_data = []
-    print("Veriler çekiliyor...")
     for url in URL_LISTESI:
         data = scrape_summoner(url)
         all_data.append(data)
-    
     return jsonify(all_data)
 
 if __name__ == '__main__':
