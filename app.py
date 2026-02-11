@@ -25,21 +25,31 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
+# Oturum (Session) başlatıyoruz
+session = requests.Session()
+
 def scrape_summoner(url):
-    # Siteyi yormamak ve engel yememek için bekleme
-    time.sleep(random.uniform(1.0, 2.5))
+    # Siteyi kızdırmamak için bekleme süresi
+    time.sleep(random.uniform(2.0, 4.0))
     
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
+    # Masaüstü Chrome taklidi yapıyoruz
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9,tr;q=0.8",
+        "Referer": "https://www.google.com/"
     }
     
     try:
-        response = requests.get(url, headers=headers, timeout=20)
+        response = session.get(url, headers=headers, timeout=25)
+        
+        # Eğer site bizi engellediyse
+        if response.status_code != 200:
+            return {"error": f"Site Hatası: {response.status_code}", "summoner": "Veri Yok", "matches": []}
+
         soup = BeautifulSoup(response.content, 'html.parser')
 
         # --- PROFİL ---
@@ -70,10 +80,11 @@ def scrape_summoner(url):
         
         for row in all_rows:
             try:
+                # KDA'sı olmayan satırı atla
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # 1. ŞAMPİYON
+                # 1. ŞAMPİYON BULMA
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -103,45 +114,34 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (HİBRİT TOPLAYICI)
+                # 2. İTEMLER (HEDEF ODAKLI TARAMA)
                 items = []
                 
-                # Sadece itemlerin olduğu özel kutuyu buluyoruz.
-                # League of Graphs'ta bu genelde "items" class'ına sahip bir div'dir.
+                # Sadece itemlerin bulunduğu sütunu (div class="items") bul.
+                # Bu sayede sayfadaki diğer sayılarla karışmaz.
                 items_container = row.find("div", class_="items")
                 
-                # Eğer özel kutu yoksa satırın tamamına bak (Yedek Plan)
-                search_area = items_container if items_container else row
+                # Eğer div varsa onun içini tara, yoksa tüm satırı tara
+                search_area = str(items_container) if items_container else str(row)
                 
-                # O alandaki tüm resimleri bul
-                img_tags = search_area.find_all("img")
+                # Regex ile 4 haneli sayıları bul (Tırnak işaretleri arasındaki)
+                # Örnek: "3078" veya '3078' veya /3078
+                matches = re.findall(r'[\/\"\'](\d{4})[\.\"\'\/]', search_area)
                 
-                for img in img_tags:
-                    # Resmin tüm olası kaynaklarını tek bir metinde birleştir
-                    full_tag = str(img) + img.get("src", "") + img.get("data-original", "")
+                for num in matches:
+                    val = int(num)
                     
-                    # 1. ELEME: Şampiyon, Rün, Büyü resimlerini direkt atla
-                    if any(x in full_tag for x in ["champion", "spell", "perk", "rune", "class", "role", "summoner"]):
-                        continue
+                    # FİLTRELER
+                    if 1000 <= val <= 8000:
+                        # Yıl (2025)
+                        if 2020 <= val <= 2030: continue
+                        # Rün ID'leri
+                        if 5000 <= val < 6000: continue
+                        # Ekran Genişlikleri (Yasaklı Liste)
+                        if val in [1080, 1200, 1280, 1440, 1920, 2560, 1024]: continue
 
-                    # 2. ARAMA: İçindeki 4 haneli sayıyı bul
-                    # Regex sadece sayıyı alır, uzantıya (.png) bakmaz.
-                    match = re.search(r"(\d{4})", full_tag)
-                    
-                    if match:
-                        val = int(match.group(1))
-                        
-                        # 3. DOĞRULAMA: Sayı mantıklı bir item ID'si mi?
-                        if 1000 <= val <= 8000:
-                            # 2024, 2025 (Yıl) -> Çöp
-                            if 2020 <= val <= 2030: continue
-                            # 5000-6000 (Rün) -> Çöp
-                            if 5000 <= val < 6000: continue
-                            # Ekran Genişlikleri -> Çöp
-                            if val in [1080, 1200, 1280, 1440, 1920]: continue
-                            
-                            # ALTIN VURUŞ: Riot'un temiz sunucusundan resmi oluştur
-                            items.append(f"{RIOT_CDN}/item/{val}.png")
+                        # Riot CDN'den link oluştur
+                        items.append(f"{RIOT_CDN}/item/{val}.png")
 
                 # Tekrarları Temizle
                 clean_items = []
@@ -151,7 +151,7 @@ def scrape_summoner(url):
                         clean_items.append(x)
                         seen.add(x)
                 
-                # 7 İtem Limiti
+                # İlk 7 itemi al
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
