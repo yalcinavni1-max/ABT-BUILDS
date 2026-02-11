@@ -78,7 +78,10 @@ function createProfileCard(user) {
                 match.items.forEach(itemUrl => {
                     itemsHtml += `
                         <div class="item-slot">
-                            <img src="${itemUrl}" class="item-img" alt="Item" onerror="this.style.display='none'">
+                        // DOĞRUSU BU:
+                        <img src="${itemUrl}" class="item-img" alt="Item" onerror="this.style.display='none'">
+
+
                         </div>
                     `;
                 });
@@ -121,3 +124,4 @@ function createProfileCard(user) {
 
 // Başlat
 fetchMatches();
+
