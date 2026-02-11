@@ -7,7 +7,7 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# Takip Listesi
+# --- TAKİP EDİLECEK HESAPLAR LİSTESİ ---
 URL_LISTESI = [
     "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138",
     "https://www.leagueofgraphs.com/summoner/tr/D%C3%96L+VE+OKS%C4%B0JEN-011"
@@ -24,6 +24,7 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
+# --- TEK BİR KULLANICIYI ÇEKEN FONKSİYON ---
 def scrape_summoner(url):
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
@@ -37,14 +38,15 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # İsim
-        summoner_name = "Sihirdar"
+        # 1. İSİM VE RANK
+        summoner_name = "Bilinmeyen Sihirdar"
         try:
+            # Sayfa başlığından ismi çek (Daha garanti)
             title = soup.find("title").text
+            # Örn: "Ragnar Lothbrok - League of Legends..." -> Sadece ismi al
             summoner_name = title.split("(")[0].strip().replace(" - League of Legends", "")
         except: pass
 
-        # Rank
         rank_text = "Unranked"
         try:
             banner_sub = soup.find("div", class_="bannerSubtitle")
@@ -54,14 +56,14 @@ def scrape_summoner(url):
                 if tier: rank_text = tier.text.strip()
         except: pass
 
-        # İkon
+        # Profil Resmi
         profile_icon = f"{RIOT_CDN}/profileicon/29.png"
         try:
             img = soup.find("div", class_="img").find("img")
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # MAÇLAR
+        # 2. MAÇLAR
         matches_info = []
         all_rows = soup.find_all("tr")
         
@@ -70,7 +72,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # Şampiyon
+                # ŞAMPİYON
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -90,38 +92,36 @@ def scrape_summoner(url):
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
                 
+                if champ_key == "Poro":
+                    imgs = row.find_all("img")
+                    for img in imgs:
+                        alt = img.get("alt", "")
+                        if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold"]:
+                            champ_key = alt.replace(" ", "").replace("'", "").replace(".", "")
+                            break
+                
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # --- V39: GÜVENLİ FİLTRELEME (Çökme Yok) ---
+                # İTEMLER
                 items = []
-                row_html = str(row)
-                
-                # Tüm 4 haneli sayıları bul
-                candidates = re.findall(r"(\d{4})", row_html)
-                
-                found_items = []
-                for num in candidates:
-                    val = int(num)
-                    
-                    # 1. KURAL: Sadece 1000-8000 arası
-                    if 1000 <= val <= 8000:
-                        # 2. KURAL: Yasaklı Listesi (Bunlar item değil, HTML kodları)
-                        # 1200: Genişlik, 64: Boyut, 2026: Yıl, 5000+: Rünler
-                        if val in [1200, 1280, 1080, 1000]: continue 
-                        if 2020 <= val <= 2030: continue
-                        if 5000 <= val < 6000: continue
-                        
-                        found_items.append(f"{RIOT_CDN}/item/{val}.png")
+                img_tags = row.find_all("img")
+                for img in img_tags:
+                    img_str = str(img)
+                    if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str: continue
+                    candidates = re.findall(r"(\d{4})", img_str)
+                    for num in candidates:
+                        val = int(num)
+                        if 1000 <= val <= 8000:
+                            if 5000 <= val < 6000: continue
+                            if 2020 <= val <= 2030: continue
+                            items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                # Tekrarları Temizle
                 clean_items = []
                 seen = set()
-                for x in found_items:
+                for x in items:
                     if x not in seen:
                         clean_items.append(x)
                         seen.add(x)
-                
-                # 7 İtem Limiti
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
@@ -137,7 +137,7 @@ def scrape_summoner(url):
                 })
                 if len(matches_info) >= 5: break
             except: continue
-        
+            
         return {
             "summoner": summoner_name,
             "rank": rank_text,
@@ -148,13 +148,17 @@ def scrape_summoner(url):
     except Exception as e:
         return {"error": str(e), "summoner": "Hata", "matches": []}
 
+# --- API: TÜM KULLANICILARI DÖNDÜR ---
 @app.route('/api/get-ragnar', methods=['GET'])
 def get_all_users():
     all_data = []
+    print("Veriler çekiliyor...")
     for url in URL_LISTESI:
         data = scrape_summoner(url)
         all_data.append(data)
+    
     return jsonify(all_data)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+
