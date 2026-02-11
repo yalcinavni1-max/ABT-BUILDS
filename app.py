@@ -25,26 +25,31 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
+# Oturum açarak (Session) çerezleri koruyalım, böylece site bizi engellemez.
+session = requests.Session()
+
 def scrape_summoner(url):
-    # Bot olmadığımızı kanıtlamak için biraz bekleyelim (Ragnar'ın geri gelmesi için)
-    time.sleep(random.uniform(0.5, 1.5))
+    # Engel yememek için her istekten önce 2-4 saniye bekle
+    time.sleep(random.uniform(2.0, 4.0))
     
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
+    # En güncel Chrome tarayıcı başlığı
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.google.com/"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9,tr;q=0.8",
+        "Referer": "https://www.google.com/",
+        "Connection": "keep-alive"
     }
     
     try:
-        response = requests.get(url, headers=headers, timeout=20)
+        response = session.get(url, headers=headers, timeout=25)
         
-        # Eğer site bizi engellediyse boş dönme, hatayı yakala
         if response.status_code != 200:
-            print(f"Hata: {url} - Kod: {response.status_code}")
-            return {"error": "Site Erişimi", "summoner": "Veri Alınamadı", "matches": []}
+            print(f"Site Engeli: {response.status_code}")
+            return {"error": "Site Erişimi Engellendi", "summoner": "Veri Yok", "matches": []}
 
         soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -57,10 +62,8 @@ def scrape_summoner(url):
 
         rank_text = "Unranked"
         try:
-            # Farklı rank elementlerini dene
             banner_sub = soup.find("div", class_="bannerSubtitle")
-            if banner_sub: 
-                rank_text = banner_sub.text.strip()
+            if banner_sub: rank_text = banner_sub.text.strip()
             else:
                 tier = soup.find("div", class_="league-tier")
                 if tier: rank_text = tier.text.strip()
@@ -78,13 +81,11 @@ def scrape_summoner(url):
         
         for row in all_rows:
             try:
-                # Sadece maç satırlarını al (KDA içerenler)
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
                 # 1. ŞAMPİYON
                 champ_key = "Poro"
-                # Linklerden şampiyon adını bulmaya çalış
                 links = row.find_all("a")
                 for link in links:
                     href = link.get("href", "")
@@ -92,7 +93,6 @@ def scrape_summoner(url):
                         parts = href.split("/")
                         if len(parts) > 3:
                             raw = parts[3].replace("-", "").replace(" ", "").lower()
-                            # İsim düzeltmeleri
                             name_map = {
                                 "wukong": "MonkeyKing", "renata": "Renata", "fiddlesticks": "Fiddlesticks",
                                 "kais'a": "Kaisa", "kaisa": "Kaisa", "leesin": "LeeSin", "belveth": "Belveth",
@@ -104,45 +104,38 @@ def scrape_summoner(url):
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
                 
-                # Bulamazsa resimlerden bul
                 if champ_key == "Poro":
-                    imgs = row.find_all("img")
-                    for img in imgs:
+                     imgs = row.find_all("img")
+                     for img in imgs:
                         alt = img.get("alt", "")
                         if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold"]:
                             champ_key = alt.replace(" ", "").replace("'", "").replace(".", "")
                             break
-
+                
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (SAFKAN ID AVCISI)
+                # 2. İTEMLER (GENİŞ KAPSAMLI ID TARAMASI)
                 items = []
                 
-                # HTML kodunu metne çevir
+                # Regex: .png, .webp veya .jpg ile biten 4 haneli sayıları bul
+                # Örn: 3078.png veya 6672.webp
                 row_html = str(row)
-                
-                # REGEX: Nerede olursa olsun "1234.png" formatını bul.
-                # Bu; src, data-src, background-image fark etmeksizin çalışır.
-                # (\d{4}) -> 4 haneli sayıları yakalar.
-                matches = re.findall(r"(\d{4})\.png", row_html)
+                matches = re.findall(r"(\d{4})\.(?:png|webp|jpg)", row_html)
                 
                 for num in matches:
                     val = int(num)
                     
-                    # FİLTRELER (Yanlışları Ele)
+                    # FİLTRELER
                     if 1000 <= val <= 8000:
-                        # Yıl klasörleri (2024, 2025) -> Ele
+                        # Yıl (2025) ve Rün (5000'ler) hariç
                         if 2020 <= val <= 2030: continue
-                        # Rünler (5000-5999) -> Ele
                         if 5000 <= val < 6000: continue
-                        # CSS Genişlikleri (64, 48 vs zaten regex ile eleniyor ama 1000 üstü varsa ele)
-                        if val in [1024, 1080, 1280, 1440, 1920, 2560]: continue 
+                        # Bilinen ekran genişlikleri
+                        if val in [1080, 1200, 1280, 1440, 1920]: continue
 
-                        # Geçerli İtem!
-                        # Biz site linkini kullanmıyoruz, Riot'un temiz linkini oluşturuyoruz.
                         items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                # Tekrarları Temizle (Sırayı bozmadan)
+                # Tekrarları Temizle
                 clean_items = []
                 seen = set()
                 for x in items:
@@ -150,7 +143,6 @@ def scrape_summoner(url):
                         clean_items.append(x)
                         seen.add(x)
                 
-                # İlk 7 itemi al
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
@@ -175,7 +167,6 @@ def scrape_summoner(url):
         }
 
     except Exception as e:
-        print(f"Genel Hata: {e}")
         return {"error": str(e), "summoner": "Hata", "matches": []}
 
 @app.route('/api/get-ragnar', methods=['GET'])
@@ -183,7 +174,6 @@ def get_all_users():
     all_data = []
     for url in URL_LISTESI:
         data = scrape_summoner(url)
-        # Hata olsa bile listeye ekle ki diğer kullanıcı görünsün
         all_data.append(data)
     return jsonify(all_data)
 
