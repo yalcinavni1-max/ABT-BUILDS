@@ -87,7 +87,6 @@ def scrape_summoner(url):
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
                 
-                # Yedek Şampiyon Bulucu
                 if champ_key == "Poro":
                     imgs = row.find_all("img")
                     for img in imgs:
@@ -98,24 +97,43 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (NOKTA ATIŞI - KESİN ÇÖZÜM)
+                # 2. İTEMLER (SÜPÜRGE MODU)
                 items = []
-                row_html = str(row) # Satırın tüm kodunu al
+                img_tags = row.find_all("img")
                 
-                # Regex: SADECE "/items/.../1234.png" formatına uyanları al.
-                # Bu sayede width="64" gibi sayıları ASLA almaz.
-                candidates = re.findall(r"items/[^\"\'\s]+?(\d{4})\.png", row_html)
-                
-                for num in candidates:
-                    val = int(num)
-                    if 1000 <= val <= 8000:
-                        # Rünler ve Yıllar hariç (5000-5999 genelde ründür)
-                        if 5000 <= val < 6000: continue
-                        if 2020 <= val <= 2030: continue
+                for img in img_tags:
+                    # Resmin olası tüm kaynaklarını al
+                    possible_urls = [
+                        img.get("src", ""),
+                        img.get("data-src", ""),
+                        img.get("data-original", "")
+                    ]
+                    
+                    for url in possible_urls:
+                        if not url: continue
                         
-                        items.append(f"{RIOT_CDN}/item/{val}.png")
+                        # --- ELEME FİLTRESİ ---
+                        # Eğer linkin içinde bunlar varsa, bu bir item DEĞİLDİR.
+                        if any(x in url for x in ["champion", "summoner", "spell", "perk", "rune", "class", "tier", "role", "event"]):
+                            continue
 
-                # Tekrarları temizle
+                        # Geriye kalan linklerin içinden 4 haneli sayıları çek
+                        matches = re.findall(r"(\d{4})", url)
+                        for num in matches:
+                            val = int(num)
+                            
+                            # Mantıklı İtem Aralığı
+                            if 1000 <= val <= 8000:
+                                # Yıl klasörlerini (2024, 2025) ele
+                                if 2020 <= val <= 2030: continue
+                                # Rün ID'lerini (5000-5999) ele
+                                if 5000 <= val < 6000: continue
+                                
+                                # Eğer buraya kadar geldiyse bu kesin itemdir
+                                items.append(f"{RIOT_CDN}/item/{val}.png")
+                                break # Bu resimden bir ID bulduk, diğerlerine bakmaya gerek yok
+
+                # Tekrarları Temizle
                 clean_items = []
                 seen = set()
                 for x in items:
@@ -123,7 +141,6 @@ def scrape_summoner(url):
                         clean_items.append(x)
                         seen.add(x)
                 
-                # 7 İtem Limiti
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
