@@ -28,7 +28,8 @@ def scrape_summoner(url):
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        # En güncel tarayıcı taklidi yapıyoruz ki site bizi bot sanıp resimleri gizlemesin
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9"
     }
     
@@ -67,7 +68,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # 1. ŞAMPİYON
+                # 1. ŞAMPİYON BULMA
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -97,12 +98,13 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (SÜPÜRGE MODU)
+                # 2. İTEMLER (GÖZÜ KARA MODU)
                 items = []
                 img_tags = row.find_all("img")
                 
                 for img in img_tags:
-                    # Resmin olası tüm kaynaklarını al
+                    # Resmin olası bütün kaynaklarını al (src, data-src, data-original)
+                    # League of Graphs, gerçek item linkini genelde 'data-original' içine saklar.
                     possible_urls = [
                         img.get("src", ""),
                         img.get("data-src", ""),
@@ -112,28 +114,37 @@ def scrape_summoner(url):
                     for url in possible_urls:
                         if not url: continue
                         
-                        # --- ELEME FİLTRESİ ---
-                        # Eğer linkin içinde bunlar varsa, bu bir item DEĞİLDİR.
-                        if any(x in url for x in ["champion", "summoner", "spell", "perk", "rune", "class", "tier", "role", "event"]):
+                        # --- FİLTRELER (Çok Basit ve Net) ---
+                        
+                        # 1. Eğer linkin içinde "champion", "spell", "perk" (rün) kelimeleri varsa ATLA.
+                        if any(x in url for x in ["champion", "summoner", "spell", "perk", "rune", "class", "role"]):
                             continue
 
-                        # Geriye kalan linklerin içinden 4 haneli sayıları çek
+                        # 2. Linkin içindeki sayıları çek
                         matches = re.findall(r"(\d{4})", url)
+                        
                         for num in matches:
                             val = int(num)
                             
-                            # Mantıklı İtem Aralığı
+                            # 3. SAYI FİLTRESİ (Sadece gerçek item aralığı)
+                            # 1000'den küçükse item değildir.
+                            # 8000'den büyükse item değildir.
                             if 1000 <= val <= 8000:
-                                # Yıl klasörlerini (2024, 2025) ele
+                                
+                                # Yıl klasörleri (2024, 2025 vb.) -> ATLA
                                 if 2020 <= val <= 2030: continue
-                                # Rün ID'lerini (5000-5999) ele
+                                
+                                # Rün ID'leri (5000-5999 arası genelde ründür) -> ATLA
                                 if 5000 <= val < 6000: continue
                                 
-                                # Eğer buraya kadar geldiyse bu kesin itemdir
-                                items.append(f"{RIOT_CDN}/item/{val}.png")
-                                break # Bu resimden bir ID bulduk, diğerlerine bakmaya gerek yok
+                                # Ekran çözünürlüğü (1200, 1080 vb.) -> ATLA
+                                if val in [1080, 1200, 1280, 1440, 1920]: continue
 
-                # Tekrarları Temizle
+                                # Geriye kalan her şey İTEMDİR.
+                                items.append(f"{RIOT_CDN}/item/{val}.png")
+                                break # Bir resimden bir item çıkardık, diğer URL'lere bakma.
+
+                # Tekrarları Temizle (Set kullanarak)
                 clean_items = []
                 seen = set()
                 for x in items:
@@ -141,6 +152,7 @@ def scrape_summoner(url):
                         clean_items.append(x)
                         seen.add(x)
                 
+                # İlk 7 tanesini al
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
