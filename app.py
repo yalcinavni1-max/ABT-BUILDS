@@ -7,7 +7,7 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# Takip Edilecek Linkler
+# Takip Listesi
 URL_LISTESI = [
     "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138",
     "https://www.leagueofgraphs.com/summoner/tr/D%C3%96L+VE+OKS%C4%B0JEN-011"
@@ -37,13 +37,14 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # İsim ve Rank
+        # İsim
         summoner_name = "Sihirdar"
         try:
             title = soup.find("title").text
             summoner_name = title.split("(")[0].strip().replace(" - League of Legends", "")
         except: pass
 
+        # Rank
         rank_text = "Unranked"
         try:
             banner_sub = soup.find("div", class_="bannerSubtitle")
@@ -53,14 +54,14 @@ def scrape_summoner(url):
                 if tier: rank_text = tier.text.strip()
         except: pass
 
-        # Profil Resmi
+        # İkon
         profile_icon = f"{RIOT_CDN}/profileicon/29.png"
         try:
             img = soup.find("div", class_="img").find("img")
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # MAÇLARI ÇEK
+        # MAÇLAR
         matches_info = []
         all_rows = soup.find_all("tr")
         
@@ -69,7 +70,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # Şampiyon Bulma
+                # Şampiyon
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -91,50 +92,37 @@ def scrape_summoner(url):
                 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # --- V38: KESKİN NİŞANCI İTEM BULUCU ---
+                # --- V39: GÜVENLİ FİLTRELEME (Çökme Yok) ---
                 items = []
                 row_html = str(row)
                 
-                # Regex sadece KESİN item kalıplarına bakar:
-                # 1. item-icon-XXXX
-                # 2. data-item-id="XXXX"
-                # 3. /item/XXXX.png
+                # Tüm 4 haneli sayıları bul
+                candidates = re.findall(r"(\d{4})", row_html)
                 
-                matches = re.findall(r"item-icon-(\d+)|data-item-id=\"(\d+)\"|/item/(\d+)\.png", row_html)
-                
-                found_ids = []
-                for m in matches:
-                    # Regex grubu hangisini bulduysa onu al (boş olmayan)
-                    for val in m:
-                        if val:
-                            found_ids.append(int(val))
-
-                # Filtreleme
-                clean_items = []
-                # Duplicate kontrolü yapmıyoruz (Seen set yok), çünkü adam belki 2 tane aynı kılıcı aldı.
-                # Sadece ardışık tekrarları ve 0 itemleri önleyelim.
-                
-                for val in found_ids:
-                    if 1000 <= val <= 8000: # Sadece gerçek item aralığı
-                        if 5000 <= val < 6000: continue # Rünleri at
-                        if 2020 <= val <= 2030: continue # Yılları at
+                found_items = []
+                for num in candidates:
+                    val = int(num)
+                    
+                    # 1. KURAL: Sadece 1000-8000 arası
+                    if 1000 <= val <= 8000:
+                        # 2. KURAL: Yasaklı Listesi (Bunlar item değil, HTML kodları)
+                        # 1200: Genişlik, 64: Boyut, 2026: Yıl, 5000+: Rünler
+                        if val in [1200, 1280, 1080, 1000]: continue 
+                        if 2020 <= val <= 2030: continue
+                        if 5000 <= val < 6000: continue
                         
-                        # Riot Linkini oluştur
-                        full_url = f"{RIOT_CDN}/item/{val}.png"
-                        clean_items.append(full_url)
+                        found_items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                # Listeyi tekilleştir (ama sırayı bozma) -> Aynı itemden 2 tane varsa kalsın mı? 
-                # League of graphs bazen tooltip için aynı id'yi 2 kere yazar. 
-                # Basit bir "Unique" filtresi uygulayalım:
-                unique_items = []
+                # Tekrarları Temizle
+                clean_items = []
                 seen = set()
-                for item in clean_items:
-                    if item not in seen:
-                        unique_items.append(item)
-                        seen.add(item)
+                for x in found_items:
+                    if x not in seen:
+                        clean_items.append(x)
+                        seen.add(x)
                 
-                # Maksimum 7 item
-                final_items = unique_items[:7]
+                # 7 İtem Limiti
+                clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
                 result = "lose"
@@ -145,11 +133,11 @@ def scrape_summoner(url):
                     "result": result,
                     "kda": kda_text,
                     "img": final_champ_img,
-                    "items": final_items
+                    "items": clean_items
                 })
                 if len(matches_info) >= 5: break
             except: continue
-            
+        
         return {
             "summoner": summoner_name,
             "rank": rank_text,
