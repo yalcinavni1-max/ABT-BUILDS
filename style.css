@@ -110,4 +110,21 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
 .result-text { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; }
 
 .kda-text { font-size: 1rem; color: #ccc; }
+/* KULLANICI KARTLARI ARASI BOŞLUK */
+.user-section {
+    margin-bottom: 60px; /* İki kullanıcı arasında boşluk */
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1); /* Ayırıcı çizgi */
+}
+
+.summoner-name-style {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #00bba3;
+}
+
+.profile-text {
+    text-align: left;
+}
+
 
