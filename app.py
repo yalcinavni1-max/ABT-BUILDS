@@ -25,32 +25,23 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
-# Oturum açarak (Session) çerezleri koruyalım, böylece site bizi engellemez.
-session = requests.Session()
-
 def scrape_summoner(url):
-    # Engel yememek için her istekten önce 2-4 saniye bekle
-    time.sleep(random.uniform(2.0, 4.0))
+    # Engel yememek için rastgele bekleme
+    time.sleep(random.uniform(1.0, 3.0))
     
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
-    # En güncel Chrome tarayıcı başlığı
+    # SİHİRLİ DOKUNUŞ: iPhone gibi davranıyoruz
+    # Bu sayede site bize basit HTML gönderiyor ve resimler gizlenmiyor.
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9,tr;q=0.8",
-        "Referer": "https://www.google.com/",
-        "Connection": "keep-alive"
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9,tr;q=0.8"
     }
     
     try:
-        response = session.get(url, headers=headers, timeout=25)
-        
-        if response.status_code != 200:
-            print(f"Site Engeli: {response.status_code}")
-            return {"error": "Site Erişimi Engellendi", "summoner": "Veri Yok", "matches": []}
-
+        response = requests.get(url, headers=headers, timeout=20)
         soup = BeautifulSoup(response.content, 'html.parser')
 
         # --- PROFİL ---
@@ -62,37 +53,46 @@ def scrape_summoner(url):
 
         rank_text = "Unranked"
         try:
-            banner_sub = soup.find("div", class_="bannerSubtitle")
-            if banner_sub: rank_text = banner_sub.text.strip()
+            # Mobil görünümde rank yeri değişebilir, genel arama yapıyoruz
+            rank_div = soup.find("div", class_="league-tier")
+            if rank_div: rank_text = rank_div.text.strip()
             else:
-                tier = soup.find("div", class_="league-tier")
-                if tier: rank_text = tier.text.strip()
+                banner = soup.find("div", class_="bannerSubtitle")
+                if banner: rank_text = banner.text.strip()
         except: pass
 
         profile_icon = f"{RIOT_CDN}/profileicon/29.png"
         try:
-            img = soup.find("div", class_="img").find("img")
-            if img: profile_icon = "https:" + img.get("src")
+            # Profil resmi
+            img_div = soup.find("div", class_="img")
+            if img_div and img_div.find("img"):
+                src = img_div.find("img").get("src")
+                if src: profile_icon = "https:" + src
         except: pass
 
         # --- MAÇLAR ---
         matches_info = []
+        # Maç tablosunu bul
         all_rows = soup.find_all("tr")
         
         for row in all_rows:
             try:
-                kda_div = row.find("div", class_="kda")
-                if not kda_div: continue
+                # KDA'sı olmayan satır maç değildir
+                if not row.find("div", class_="kda"): continue
 
-                # 1. ŞAMPİYON
+                # 1. ŞAMPİYON BULMA
                 champ_key = "Poro"
+                # Linklerden şampiyon adını çek
                 links = row.find_all("a")
                 for link in links:
                     href = link.get("href", "")
                     if "/champions/builds/" in href:
                         parts = href.split("/")
-                        if len(parts) > 3:
+                        # URL yapısı: /champions/builds/annie
+                        if len(parts) >= 3:
+                            # Parçaları temizle
                             raw = parts[3].replace("-", "").replace(" ", "").lower()
+                            # Bazı özel isimleri düzelt
                             name_map = {
                                 "wukong": "MonkeyKing", "renata": "Renata", "fiddlesticks": "Fiddlesticks",
                                 "kais'a": "Kaisa", "kaisa": "Kaisa", "leesin": "LeeSin", "belveth": "Belveth",
@@ -104,38 +104,41 @@ def scrape_summoner(url):
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
                 
-                if champ_key == "Poro":
-                     imgs = row.find_all("img")
-                     for img in imgs:
-                        alt = img.get("alt", "")
-                        if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold"]:
-                            champ_key = alt.replace(" ", "").replace("'", "").replace(".", "")
-                            break
-                
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (GENİŞ KAPSAMLI ID TARAMASI)
+                # 2. İTEMLER (HEDEF ODAKLI TARAMA)
                 items = []
                 
-                # Regex: .png, .webp veya .jpg ile biten 4 haneli sayıları bul
-                # Örn: 3078.png veya 6672.webp
-                row_html = str(row)
-                matches = re.findall(r"(\d{4})\.(?:png|webp|jpg)", row_html)
+                # Sadece itemlerin bulunduğu özel kutuyu buluyoruz: <div class="items">
+                # Bu yöntem, sayfadaki diğer sayıları item sanmamızı engeller.
+                items_container = row.find("div", class_="items")
                 
-                for num in matches:
-                    val = int(num)
+                if items_container:
+                    # Kutu içindeki tüm resimleri al
+                    images = items_container.find_all("img")
                     
-                    # FİLTRELER
-                    if 1000 <= val <= 8000:
-                        # Yıl (2025) ve Rün (5000'ler) hariç
-                        if 2020 <= val <= 2030: continue
-                        if 5000 <= val < 6000: continue
-                        # Bilinen ekran genişlikleri
-                        if val in [1080, 1200, 1280, 1440, 1920]: continue
+                    for img in images:
+                        # Link nerede olursa olsun al (src, data-src)
+                        src = img.get("src") or img.get("data-src") or ""
+                        if not src: continue
+                        
+                        # Linkin içindeki sayıyı çek
+                        # Sadece sayıları arıyoruz, link yapısına takılmıyoruz.
+                        num_match = re.search(r"(\d+)", src)
+                        if num_match:
+                            val = int(num_match.group(1))
+                            
+                            # Mantık Süzgeci
+                            # 1000'den küçük ve 8000'den büyük sayılar item değildir.
+                            # 5000-6000 arası ründür, almıyoruz.
+                            if 1000 <= val <= 8000:
+                                if 5000 <= val < 6000: continue 
+                                if 2020 <= val <= 2030: continue # Yıllar
+                                if val == 3350: continue # Totem trinket bazen karışır, istersen tut.
+                                
+                                items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                        items.append(f"{RIOT_CDN}/item/{val}.png")
-
-                # Tekrarları Temizle
+                # Tekrarları temizle
                 clean_items = []
                 seen = set()
                 for x in items:
@@ -143,11 +146,18 @@ def scrape_summoner(url):
                         clean_items.append(x)
                         seen.add(x)
                 
+                # 7 İtem Limiti
                 clean_items = clean_items[:7]
 
+                # KDA ve Sonuç
+                kda_div = row.find("div", class_="kda")
                 kda_text = kda_div.text.strip()
+                
                 result = "lose"
-                if "Victory" in row.text or "Zafer" in row.text: result = "win"
+                # Satırın metninde "Victory" veya "Zafer" geçiyor mu?
+                row_text = row.text.lower()
+                if "victory" in row_text or "zafer" in row_text: 
+                    result = "win"
                 
                 matches_info.append({
                     "champion": champ_key,
@@ -157,7 +167,8 @@ def scrape_summoner(url):
                     "items": clean_items
                 })
                 if len(matches_info) >= 5: break
-            except: continue
+            except Exception as inner_e:
+                continue
         
         return {
             "summoner": summoner_name,
