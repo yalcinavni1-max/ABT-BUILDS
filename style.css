@@ -81,17 +81,13 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
 .champ-name { font-size: 1.1rem; font-weight: bold; display: block; }
 .game-mode { font-size: 0.8rem; color: #aaa; }
 
-/* İTEMLER IZGARASI */
 .items-grid {
     display: flex;
     gap: 2px;
     flex-wrap: nowrap;
     justify-content: flex-start;
-    
-    /* BURASI ÇOK ÖNEMLİ */
-    width: 300px;
-    min-width: 300px;
-    
+    width: 300px;     /* Kontrol et */
+    min-width: 300px; /* Kontrol et */
     overflow: visible;
 }
 
@@ -131,6 +127,7 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
 .profile-text {
     text-align: left;
 }
+
 
 
 
