@@ -37,13 +37,14 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # İsim ve Rank
+        # İsim
         summoner_name = "Sihirdar"
         try:
             title = soup.find("title").text
             summoner_name = title.split("(")[0].strip().replace(" - League of Legends", "")
         except: pass
 
+        # Rank
         rank_text = "Unranked"
         try:
             banner_sub = soup.find("div", class_="bannerSubtitle")
@@ -60,24 +61,29 @@ def scrape_summoner(url):
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # MAÇLARI ÇEK
+        # MAÇLAR
         matches_info = []
         all_rows = soup.find_all("tr")
         
         for row in all_rows:
             try:
+                # KDA yoksa maç satırı değildir, geç
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # --- ŞAMPİYON BULMA (ESKİ SAĞLAM YÖNTEM) ---
+                # --- 1. ŞAMPİYON BULMA (GARANTİ YÖNTEM) ---
                 champ_key = "Poro"
+                
+                # Önce linklerden dene
                 links = row.find_all("a")
                 for link in links:
                     href = link.get("href", "")
                     if "/champions/builds/" in href:
                         parts = href.split("/")
                         if len(parts) > 3:
+                            # İsim temizleme
                             raw = parts[3].replace("-", "").replace(" ", "").lower()
+                            # Bazı istisnalar
                             name_map = {
                                 "wukong": "MonkeyKing", "renata": "Renata", "fiddlesticks": "Fiddlesticks",
                                 "kais'a": "Kaisa", "kaisa": "Kaisa", "leesin": "LeeSin", "belveth": "Belveth",
@@ -89,32 +95,43 @@ def scrape_summoner(url):
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
                 
-                # Yedek yöntem (Eğer linkten bulamazsa)
+                # Bulamazsa resimlerden dene
                 if champ_key == "Poro":
                     imgs = row.find_all("img")
                     for img in imgs:
+                        # Şampiyon resmi genellikle yuvarlaktır veya belirli class'ı vardır
+                        # League of Graphs'ta alt etiketi şampiyon ismini yazar
                         alt = img.get("alt", "")
-                        if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold"]:
+                        if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold", "Runes"]:
                             champ_key = alt.replace(" ", "").replace("'", "").replace(".", "")
                             break
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # --- İTEM BULMA (ESKİ SAĞLAM YÖNTEM) ---
+                # --- 2. İTEM BULMA (BOŞLUKLARI ÖNLEYEN YÖNTEM) ---
                 items = []
+                # Satırdaki tüm resimleri bul
                 img_tags = row.find_all("img")
+                
                 for img in img_tags:
-                    img_str = str(img)
-                    if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str: continue
-                    candidates = re.findall(r"(\d{4})", img_str)
-                    for num in candidates:
-                        val = int(num)
-                        # Filtreler
-                        if 2020 <= val <= 2030: continue
-                        if 5000 <= val < 6000: continue
-                        if 1000 <= val <= 8000:
-                            items.append(f"{RIOT_CDN}/item/{val}.png")
+                    src = img.get("src", "")
+                    
+                    # Sadece URL içinde "/items/" veya "/item/" geçen resimleri al
+                    # Bu sayede "64" veya "1200" gibi sayıları almayız.
+                    if "/item/" in src or "/items/" in src:
+                        # URL'den ID'yi çek
+                        candidates = re.findall(r"(\d{4})", src)
+                        for num in candidates:
+                            val = int(num)
+                            # 2026 gibi yıllar veya rünler gelmesin
+                            if 2020 <= val <= 2030: continue
+                            if 5000 <= val < 6000: continue
+                            if val == 7000: continue # Control ward bazen karışır
+                            
+                            if 1000 <= val <= 8000:
+                                items.append(f"{RIOT_CDN}/item/{val}.png")
 
+                # Tekrarları temizle (Set kullanarak)
                 clean_items = []
                 seen = set()
                 for x in items:
@@ -122,7 +139,7 @@ def scrape_summoner(url):
                         clean_items.append(x)
                         seen.add(x)
                 
-                # 7 İtem Limiti
+                # İlk 7 itemi al
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
