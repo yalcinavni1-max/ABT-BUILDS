@@ -28,8 +28,7 @@ def scrape_summoner(url):
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
     headers = {
-        # En güncel tarayıcı taklidi yapıyoruz ki site bizi bot sanıp resimleri gizlemesin
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9"
     }
     
@@ -89,62 +88,58 @@ def scrape_summoner(url):
                             break
                 
                 if champ_key == "Poro":
+                    # Yedek yöntem: Champion resmini bul
                     imgs = row.find_all("img")
                     for img in imgs:
                         alt = img.get("alt", "")
+                        # Şampiyon isimleri genelde alt etiketiyle gelir
                         if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold"]:
                             champ_key = alt.replace(" ", "").replace("'", "").replace(".", "")
                             break
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (GÖZÜ KARA MODU)
+                # 2. İTEMLER (OMNI-SEARCH MODU)
                 items = []
-                img_tags = row.find_all("img")
                 
+                # Sadece itemlerin olduğu sütunu (div veya td) hedefle
+                # League of Graphs'ta itemler genelde "items" class'ına sahip bir div veya td içindedir.
+                items_container = row.find("div", class_="items")
+                if not items_container:
+                    items_container = row # Bulamazsa tüm satıra bak (Fallback)
+
+                # A) İMG Etiketlerini Tara
+                img_tags = items_container.find_all("img")
                 for img in img_tags:
-                    # Resmin olası bütün kaynaklarını al (src, data-src, data-original)
-                    # League of Graphs, gerçek item linkini genelde 'data-original' içine saklar.
-                    possible_urls = [
-                        img.get("src", ""),
-                        img.get("data-src", ""),
-                        img.get("data-original", "")
-                    ]
-                    
+                    # Resmin olası tüm kaynaklarını al
+                    possible_urls = [img.get("src", ""), img.get("data-src", ""), img.get("data-original", "")]
                     for url in possible_urls:
                         if not url: continue
+                        # Şampiyon, Rün, Büyü resimlerini filtrele
+                        if any(x in url for x in ["champion", "spell", "perk", "rune", "class", "role"]): continue
                         
-                        # --- FİLTRELER (Çok Basit ve Net) ---
-                        
-                        # 1. Eğer linkin içinde "champion", "spell", "perk" (rün) kelimeleri varsa ATLA.
-                        if any(x in url for x in ["champion", "summoner", "spell", "perk", "rune", "class", "role"]):
-                            continue
-
-                        # 2. Linkin içindeki sayıları çek
                         matches = re.findall(r"(\d{4})", url)
-                        
                         for num in matches:
                             val = int(num)
-                            
-                            # 3. SAYI FİLTRESİ (Sadece gerçek item aralığı)
-                            # 1000'den küçükse item değildir.
-                            # 8000'den büyükse item değildir.
                             if 1000 <= val <= 8000:
-                                
-                                # Yıl klasörleri (2024, 2025 vb.) -> ATLA
                                 if 2020 <= val <= 2030: continue
-                                
-                                # Rün ID'leri (5000-5999 arası genelde ründür) -> ATLA
                                 if 5000 <= val < 6000: continue
-                                
-                                # Ekran çözünürlüğü (1200, 1080 vb.) -> ATLA
-                                if val in [1080, 1200, 1280, 1440, 1920]: continue
-
-                                # Geriye kalan her şey İTEMDİR.
                                 items.append(f"{RIOT_CDN}/item/{val}.png")
-                                break # Bir resimden bir item çıkardık, diğer URL'lere bakma.
 
-                # Tekrarları Temizle (Set kullanarak)
+                # B) DİV Etiketlerini Tara (Arka Plan Resmi Olasılığı)
+                div_tags = items_container.find_all("div")
+                for div in div_tags:
+                    style = div.get("style", "")
+                    if "background-image" in style or "url" in style:
+                        matches = re.findall(r"(\d{4})", style)
+                        for num in matches:
+                            val = int(num)
+                            if 1000 <= val <= 8000:
+                                if 2020 <= val <= 2030: continue
+                                if 5000 <= val < 6000: continue
+                                items.append(f"{RIOT_CDN}/item/{val}.png")
+
+                # Tekrarları Temizle
                 clean_items = []
                 seen = set()
                 for x in items:
@@ -152,7 +147,6 @@ def scrape_summoner(url):
                         clean_items.append(x)
                         seen.add(x)
                 
-                # İlk 7 tanesini al
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
