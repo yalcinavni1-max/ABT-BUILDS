@@ -1,121 +1,50 @@
 body {
+    background-color: #0a0a0c;
+    color: white;
+    font-family: 'Roboto', sans-serif;
     margin: 0;
     padding: 0;
-    font-family: 'Roboto', sans-serif;
-    color: white;
-    background-image: url('ragnar.jpg'); 
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    min-height: 100vh;
-}
-
-.overlay {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.85);
-    z-index: -1;
 }
 
 .container {
-    max-width: 900px;
+    max-width: 600px;
     margin: 0 auto;
     padding: 20px;
+    position: relative;
+    z-index: 2;
 }
 
 header {
     text-align: center;
-    margin-bottom: 30px;
-    border-bottom: 2px solid #c4b998;
-    padding-bottom: 20px;
+    margin-bottom: 40px;
 }
 
-h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
+h1 {
+    font-size: 2.5rem;
+    margin: 0;
+    color: #f0e6d2;
+}
+
+/* PROFİL KISMI */
+.user-section {
+    margin-bottom: 60px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
 
 .profile-header {
     display: flex;
-    justify-content: center;
     align-items: center;
-    gap: 20px;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding-left: 10px;
 }
 
 .profile-icon {
-    width: 90px;
-    height: 90px;
-    border-radius: 50%;
-    border: 3px solid #00bba3;
-}
-
-.highlight { color: #00bba3; font-weight: bold; font-size: 1.2rem; }
-.rank-text { font-size: 1.1rem; color: #ddd; margin-top: 5px; }
-
-/* MAÇ KARTLARI */
-.match-card {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: rgba(30, 30, 35, 0.95);
-    margin-bottom: 12px;
-    padding: 15px;
-    border-radius: 8px;
-    border-left: 6px solid gray;
-}
-
-.match-card.win { border-left-color: #5383e8; background: linear-gradient(90deg, rgba(30,50,90,0.8), rgba(25,25,30,0.95)); }
-.match-card.lose { border-left-color: #e84057; background: linear-gradient(90deg, rgba(90,30,40,0.8), rgba(25,25,30,0.95)); }
-
-.champ-info {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    width: 200px;
-}
-
-.champ-img {
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    border: 2px solid #444;
-}
-
-.champ-name { font-size: 1.1rem; font-weight: bold; display: block; }
-.game-mode { font-size: 0.8rem; color: #aaa; }
-
-.items-grid {
-    display: flex;
-    gap: 2px;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    width: 300px;     /* Kontrol et */
-    min-width: 300px; /* Kontrol et */
-    overflow: visible;
-}
-
-/* İtem slotlarının boyutunu sabitleyelim */
-.item-slot {
-    width: 35px;
-    height: 35px;
-    border: 1px solid #444;
-    background: #111;
-    border-radius: 4px;
-    flex-shrink: 0; /* Sıkışmayı önler */
-}
-
-.item-img {
-    width: 100%;
-    height: 100%;
-    border-radius: 4px;
-}
-
-.stats { text-align: right; width: 100px; }
-.result-text { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; }
-
-.kda-text { font-size: 1rem; color: #ccc; }
-/* KULLANICI KARTLARI ARASI BOŞLUK */
-.user-section {
-    margin-bottom: 60px; /* İki kullanıcı arasında boşluk */
-    padding-bottom: 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.1); /* Ayırıcı çizgi */
+    border: 2px solid #00bba3;
 }
 
 .summoner-name-style {
@@ -124,14 +53,95 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
     color: #00bba3;
 }
 
-.profile-text {
-    text-align: left;
+.rank-text {
+    color: #ccc;
+    font-size: 0.9rem;
 }
 
+/* MAÇ KARTLARI */
+.match-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    background: #1e1e1e;
+    border-left: 5px solid gray;
+}
 
+.match-card.win {
+    background: linear-gradient(90deg, rgba(30, 40, 60, 0.9) 0%, rgba(15, 20, 30, 0.9) 100%);
+    border-left-color: #2deb90;
+}
 
+.match-card.lose {
+    background: linear-gradient(90deg, rgba(60, 30, 30, 0.9) 0%, rgba(30, 15, 15, 0.9) 100%);
+    border-left-color: #ff5859;
+}
 
+.champ-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 140px;
+}
 
+.champ-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
 
+.champ-name {
+    display: block;
+    font-weight: bold;
+    font-size: 0.95rem;
+}
 
+.game-mode {
+    font-size: 0.75rem;
+    color: #888;
+}
 
+/* İTEMLER IZGARASI */
+.items-grid {
+    display: flex;
+    gap: 2px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    width: 300px;
+    min-width: 300px;
+    overflow: visible;
+}
+
+.item-slot {
+    width: 35px;
+    height: 35px;
+    border: 1px solid #444;
+    background: #111;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.item-img {
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+}
+
+.stats {
+    text-align: right;
+    width: 80px;
+}
+
+.result-text {
+    font-weight: bold;
+    font-size: 1rem;
+    margin-bottom: 2px;
+}
+
+.kda-text {
+    color: #aaa;
+    font-size: 0.9rem;
+}
