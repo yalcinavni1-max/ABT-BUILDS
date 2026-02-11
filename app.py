@@ -36,7 +36,7 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # --- KİMLİK BİLGİLERİ ---
+        # --- PROFİL ---
         summoner_name = "Sihirdar"
         try:
             title = soup.find("title").text
@@ -58,7 +58,7 @@ def scrape_summoner(url):
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # --- MAÇLARI ÇEK ---
+        # --- MAÇLAR ---
         matches_info = []
         all_rows = soup.find_all("tr")
         
@@ -67,7 +67,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # 1. ŞAMPİYON BULMA
+                # 1. ŞAMPİYON
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -97,23 +97,32 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEM BULMA (KESKİN NİŞANCI MODU)
+                # 2. İTEMLER (AKILLI TARAMA)
                 items = []
-                row_html = str(row) # Satırın tüm kodunu metin olarak al
+                img_tags = row.find_all("img")
                 
-                # Regex Açıklaması: "items/" kelimesini bul, arada ne varsa geç, 4 haneli sayıyı (.png ile biten) yakala.
-                # Bu yöntem HTML taglerine bakmaz, direkt dosya isimlerini avlar.
-                # Örnek Hedef: .../img/items/14.3/64/6672.png -> 6672'yi alır.
-                candidates = re.findall(r"items/[^\"\'\s]+?(\d{4})\.png", row_html)
-                
-                for num in candidates:
-                    val = int(num)
+                for img in img_tags:
+                    # Resmin linkini al (src veya data-src)
+                    src = img.get("src") or img.get("data-src") or ""
                     
-                    if 1000 <= val <= 8000:
-                        if 2020 <= val <= 2030: continue
-                        if 5000 <= val < 6000: continue
+                    # FİLTRE 1: Şampiyon, Büyü, Rün, Rol ikonlarını atla
+                    if any(x in src for x in ["champion", "summoner", "spell", "perk", "rune", "role", "class"]):
+                        continue
+                    
+                    # FİLTRE 2: Linkin içindeki TÜM 4 haneli sayıları bul
+                    # (width="64" gibi HTML kodlarını almaz, çünkü sadece 'src' içine bakıyoruz)
+                    candidates = re.findall(r"(\d{4})", src)
+                    
+                    for num in candidates:
+                        val = int(num)
                         
-                        items.append(f"{RIOT_CDN}/item/{val}.png")
+                        # FİLTRE 3: Mantıklı İtem Aralığı (1000 - 8000)
+                        if 1000 <= val <= 8000:
+                            if 2020 <= val <= 2030: continue # Yıl klasörleri (2024 vb.)
+                            if 5000 <= val < 6000: continue # Rün ID'leri
+                            
+                            # Geçerli item!
+                            items.append(f"{RIOT_CDN}/item/{val}.png")
 
                 # Tekrarları temizle
                 clean_items = []
@@ -158,4 +167,5 @@ def get_all_users():
     return jsonify(all_data)
 
 if __name__ == '__main__':
+    # Debug modu kapalı, host 0.0.0.0
     app.run(host='0.0.0.0', port=5000)
