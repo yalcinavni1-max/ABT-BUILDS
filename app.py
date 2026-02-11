@@ -99,27 +99,27 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # --- İTEM BULMA (KARA LİSTE YÖNTEMİ) ---
+                # --- CERRAH YÖNTEMİ İLE İTEM BULMA (Hatasız) ---
                 items = []
-                row_html = str(row)
+                img_tags = row.find_all("img")
                 
-                # Sayfadaki TÜM 4 haneli sayıları bul (Garanti Yöntem)
-                candidates = re.findall(r"(\d{4})", row_html)
-                
-                for num in candidates:
-                    val = int(num)
+                for img in img_tags:
+                    # Resmin tüm kodunu al (src, data-src vs.)
+                    img_str = str(img)
                     
-                    # 1. KURAL: Sadece geçerli item aralığı (1000 - 8000)
-                    if 1000 <= val <= 8000:
+                    # Regex ile SADECE "/item/1234.png" kalıbını ara.
+                    # Bu sayede width="1200" gibi sayıları ASLA almaz.
+                    match = re.search(r"/item/(\d+)\.png", img_str)
+                    
+                    if match:
+                        val = int(match.group(1))
                         
-                        # 2. KURAL: KARA LİSTE (BOŞLUK YAPAN SAYILAR)
-                        # Bu sayılar HTML kodlarında geçer ama item değildir.
-                        if val in [1200, 1280, 1080, 1440, 1024, 2500]: continue # Ekran genişlikleri
-                        if 2020 <= val <= 2030: continue # Yıllar
-                        if 5000 <= val < 6000: continue # Rünler
-                        if val == 7000: continue # Hata yapan totem
-                        
-                        items.append(f"{RIOT_CDN}/item/{val}.png")
+                        # Yine de temel filtreleri uygulayalım
+                        if 1000 <= val <= 8000:
+                            if 2020 <= val <= 2030: continue
+                            if 5000 <= val < 6000: continue
+                            
+                            items.append(f"{RIOT_CDN}/item/{val}.png")
 
                 # Tekrarları Temizle
                 clean_items = []
