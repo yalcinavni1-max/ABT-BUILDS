@@ -84,13 +84,13 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
 /* İTEMLER IZGARASI */
 .items-grid {
     display: flex;
-    gap: 3px; /* Boşlukları biraz azalttık ki sığsın */
-    flex-wrap: nowrap; /* ÖNEMLİ: Asla alt satıra geçme, yan yana dur */
+    gap: 2px; /* Aradaki boşluğu azalttık ki sığsın */
+    flex-wrap: nowrap; /* Asla alt satıra geçme */
     justify-content: flex-start; /* Sola yasla */
-    width: 280px; /* Genişliği artırdık (Eskiden 260px idi) */
-    overflow: hidden; /* Taşarsa gizle ama nowrap sayesinde taşmaz */
+    width: 290px; /* GENİŞLİK ARTTI (Eskisi dardı) */
+    min-width: 290px; /* Küçülmesine izin verme */
+    overflow: visible; /* Taşarsa da göster */
 }
-
 /* Kutu Stili */
 .item-slot {
     width: 32px;
@@ -126,5 +126,6 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
 .profile-text {
     text-align: left;
 }
+
 
 
