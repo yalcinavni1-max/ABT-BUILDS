@@ -1,4 +1,6 @@
 import re
+import time
+import random
 from flask import Flask, jsonify, send_from_directory
 import requests
 from bs4 import BeautifulSoup
@@ -24,16 +26,26 @@ def get_latest_version():
     return "14.3.1"
 
 def scrape_summoner(url):
+    # Bot olmadığımızı kanıtlamak için biraz bekleyelim (Ragnar'ın geri gelmesi için)
+    time.sleep(random.uniform(0.5, 1.5))
+    
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.google.com/"
     }
     
     try:
-        response = requests.get(url, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, timeout=20)
+        
+        # Eğer site bizi engellediyse boş dönme, hatayı yakala
+        if response.status_code != 200:
+            print(f"Hata: {url} - Kod: {response.status_code}")
+            return {"error": "Site Erişimi", "summoner": "Veri Alınamadı", "matches": []}
+
         soup = BeautifulSoup(response.content, 'html.parser')
 
         # --- PROFİL ---
@@ -45,8 +57,10 @@ def scrape_summoner(url):
 
         rank_text = "Unranked"
         try:
+            # Farklı rank elementlerini dene
             banner_sub = soup.find("div", class_="bannerSubtitle")
-            if banner_sub: rank_text = banner_sub.text.strip()
+            if banner_sub: 
+                rank_text = banner_sub.text.strip()
             else:
                 tier = soup.find("div", class_="league-tier")
                 if tier: rank_text = tier.text.strip()
@@ -64,11 +78,13 @@ def scrape_summoner(url):
         
         for row in all_rows:
             try:
+                # Sadece maç satırlarını al (KDA içerenler)
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # 1. ŞAMPİYON BULMA
+                # 1. ŞAMPİYON
                 champ_key = "Poro"
+                # Linklerden şampiyon adını bulmaya çalış
                 links = row.find_all("a")
                 for link in links:
                     href = link.get("href", "")
@@ -76,6 +92,7 @@ def scrape_summoner(url):
                         parts = href.split("/")
                         if len(parts) > 3:
                             raw = parts[3].replace("-", "").replace(" ", "").lower()
+                            # İsim düzeltmeleri
                             name_map = {
                                 "wukong": "MonkeyKing", "renata": "Renata", "fiddlesticks": "Fiddlesticks",
                                 "kais'a": "Kaisa", "kaisa": "Kaisa", "leesin": "LeeSin", "belveth": "Belveth",
@@ -87,59 +104,45 @@ def scrape_summoner(url):
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
                 
+                # Bulamazsa resimlerden bul
                 if champ_key == "Poro":
-                    # Yedek yöntem: Champion resmini bul
                     imgs = row.find_all("img")
                     for img in imgs:
                         alt = img.get("alt", "")
-                        # Şampiyon isimleri genelde alt etiketiyle gelir
                         if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold"]:
                             champ_key = alt.replace(" ", "").replace("'", "").replace(".", "")
                             break
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (OMNI-SEARCH MODU)
+                # 2. İTEMLER (SAFKAN ID AVCISI)
                 items = []
                 
-                # Sadece itemlerin olduğu sütunu (div veya td) hedefle
-                # League of Graphs'ta itemler genelde "items" class'ına sahip bir div veya td içindedir.
-                items_container = row.find("div", class_="items")
-                if not items_container:
-                    items_container = row # Bulamazsa tüm satıra bak (Fallback)
+                # HTML kodunu metne çevir
+                row_html = str(row)
+                
+                # REGEX: Nerede olursa olsun "1234.png" formatını bul.
+                # Bu; src, data-src, background-image fark etmeksizin çalışır.
+                # (\d{4}) -> 4 haneli sayıları yakalar.
+                matches = re.findall(r"(\d{4})\.png", row_html)
+                
+                for num in matches:
+                    val = int(num)
+                    
+                    # FİLTRELER (Yanlışları Ele)
+                    if 1000 <= val <= 8000:
+                        # Yıl klasörleri (2024, 2025) -> Ele
+                        if 2020 <= val <= 2030: continue
+                        # Rünler (5000-5999) -> Ele
+                        if 5000 <= val < 6000: continue
+                        # CSS Genişlikleri (64, 48 vs zaten regex ile eleniyor ama 1000 üstü varsa ele)
+                        if val in [1024, 1080, 1280, 1440, 1920, 2560]: continue 
 
-                # A) İMG Etiketlerini Tara
-                img_tags = items_container.find_all("img")
-                for img in img_tags:
-                    # Resmin olası tüm kaynaklarını al
-                    possible_urls = [img.get("src", ""), img.get("data-src", ""), img.get("data-original", "")]
-                    for url in possible_urls:
-                        if not url: continue
-                        # Şampiyon, Rün, Büyü resimlerini filtrele
-                        if any(x in url for x in ["champion", "spell", "perk", "rune", "class", "role"]): continue
-                        
-                        matches = re.findall(r"(\d{4})", url)
-                        for num in matches:
-                            val = int(num)
-                            if 1000 <= val <= 8000:
-                                if 2020 <= val <= 2030: continue
-                                if 5000 <= val < 6000: continue
-                                items.append(f"{RIOT_CDN}/item/{val}.png")
+                        # Geçerli İtem!
+                        # Biz site linkini kullanmıyoruz, Riot'un temiz linkini oluşturuyoruz.
+                        items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                # B) DİV Etiketlerini Tara (Arka Plan Resmi Olasılığı)
-                div_tags = items_container.find_all("div")
-                for div in div_tags:
-                    style = div.get("style", "")
-                    if "background-image" in style or "url" in style:
-                        matches = re.findall(r"(\d{4})", style)
-                        for num in matches:
-                            val = int(num)
-                            if 1000 <= val <= 8000:
-                                if 2020 <= val <= 2030: continue
-                                if 5000 <= val < 6000: continue
-                                items.append(f"{RIOT_CDN}/item/{val}.png")
-
-                # Tekrarları Temizle
+                # Tekrarları Temizle (Sırayı bozmadan)
                 clean_items = []
                 seen = set()
                 for x in items:
@@ -147,6 +150,7 @@ def scrape_summoner(url):
                         clean_items.append(x)
                         seen.add(x)
                 
+                # İlk 7 itemi al
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
@@ -171,6 +175,7 @@ def scrape_summoner(url):
         }
 
     except Exception as e:
+        print(f"Genel Hata: {e}")
         return {"error": str(e), "summoner": "Hata", "matches": []}
 
 @app.route('/api/get-ragnar', methods=['GET'])
@@ -178,6 +183,7 @@ def get_all_users():
     all_data = []
     for url in URL_LISTESI:
         data = scrape_summoner(url)
+        # Hata olsa bile listeye ekle ki diğer kullanıcı görünsün
         all_data.append(data)
     return jsonify(all_data)
 
