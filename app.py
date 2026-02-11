@@ -3,34 +3,31 @@ from flask import Flask, jsonify, send_from_directory
 import requests
 from bs4 import BeautifulSoup
 from flask_cors import CORS
-import os
 
-# Render için gerekli ayar (Siteyi buradan sunacak)
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-HEDEF_URL = "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138"
+# --- TAKİP EDİLECEK HESAPLAR LİSTESİ ---
+URL_LISTESI = [
+    "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138",
+    "https://www.leagueofgraphs.com/summoner/tr/D%C3%96L+VE+OKS%C4%B0JEN-011"
+]
 
-# --- 1. SİTEYİ AÇAN KOD ---
 @app.route('/')
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-# --- 2. RAGNAR V33 (ZAMAN YOLCUSU) ---
-def get_latest_ddragon_version():
+def get_latest_version():
     try:
-        # Riot'tan en güncel sürümü çek (16.3.1 gibi)
-        response = requests.get("https://ddragon.leagueoflegends.com/api/versions.json", timeout=5)
-        if response.status_code == 200:
-            versions = response.json()
-            return versions[0]
+        r = requests.get("https://ddragon.leagueoflegends.com/api/versions.json")
+        if r.status_code == 200: return r.json()[0]
     except: pass
-    return "14.3.1" # Yedek
+    return "14.3.1"
 
-@app.route('/api/get-ragnar', methods=['GET'])
-def get_ragnar_data():
-    current_version = get_latest_ddragon_version()
-    RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{current_version}/img"
+# --- TEK BİR KULLANICIYI ÇEKEN FONKSİYON ---
+def scrape_summoner(url):
+    version = get_latest_version()
+    RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
@@ -38,11 +35,19 @@ def get_ragnar_data():
     }
     
     try:
-        response = requests.get(HEDEF_URL, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # LEVEL / RANK
-        rank_text = "Level Bilgisi Yok"
+        # 1. İSİM VE RANK
+        summoner_name = "Bilinmeyen Sihirdar"
+        try:
+            # Sayfa başlığından ismi çek (Daha garanti)
+            title = soup.find("title").text
+            # Örn: "Ragnar Lothbrok - League of Legends..." -> Sadece ismi al
+            summoner_name = title.split("(")[0].strip().replace(" - League of Legends", "")
+        except: pass
+
+        rank_text = "Unranked"
         try:
             banner_sub = soup.find("div", class_="bannerSubtitle")
             if banner_sub: rank_text = banner_sub.text.strip()
@@ -58,7 +63,7 @@ def get_ragnar_data():
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # MAÇLAR
+        # 2. MAÇLAR
         matches_info = []
         all_rows = soup.find_all("tr")
         
@@ -94,28 +99,21 @@ def get_ragnar_data():
                         if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold"]:
                             champ_key = alt.replace(" ", "").replace("'", "").replace(".", "")
                             break
-
+                
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # İTEMLER (V33 MANTIĞI - Sen bunu sevmiştin)
+                # İTEMLER
                 items = []
                 img_tags = row.find_all("img")
-                
                 for img in img_tags:
                     img_str = str(img)
-                    
-                    if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str:
-                        continue
-                    
+                    if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str: continue
                     candidates = re.findall(r"(\d{4})", img_str)
-                    
                     for num in candidates:
                         val = int(num)
-                        # V33 Filtreleri
-                        if 2020 <= val <= 2030: continue # Yılları at
-                        if 5000 <= val < 6000: continue # Rünleri at
-                        
                         if 1000 <= val <= 8000:
+                            if 5000 <= val < 6000: continue
+                            if 2020 <= val <= 2030: continue
                             items.append(f"{RIOT_CDN}/item/{val}.png")
 
                 clean_items = []
@@ -137,21 +135,29 @@ def get_ragnar_data():
                     "img": final_champ_img,
                     "items": clean_items
                 })
-
                 if len(matches_info) >= 5: break
-
             except: continue
-        
-        return jsonify({
-            "summoner": "Ragnar Lothbrok #0138",
+            
+        return {
+            "summoner": summoner_name,
             "rank": rank_text,
             "icon": profile_icon,
             "matches": matches_info
-        })
+        }
 
     except Exception as e:
-        return jsonify({"error": str(e)})
+        return {"error": str(e), "summoner": "Hata", "matches": []}
+
+# --- API: TÜM KULLANICILARI DÖNDÜR ---
+@app.route('/api/get-ragnar', methods=['GET'])
+def get_all_users():
+    all_data = []
+    print("Veriler çekiliyor...")
+    for url in URL_LISTESI:
+        data = scrape_summoner(url)
+        all_data.append(data)
+    
+    return jsonify(all_data)
 
 if __name__ == '__main__':
-    # Render'da çalışması için host='0.0.0.0' şart
     app.run(host='0.0.0.0', port=5000)
