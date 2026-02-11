@@ -16,7 +16,7 @@ async function fetchMatches() {
 
     } catch (error) {
         console.error("Hata:", error);
-        profilesArea.innerHTML = `<div style="text-align:center; padding:50px; color:#aaa;">Veriler yüklenirken bir hata oluştu.<br>Lütfen sayfayı yenileyin.</div>`;
+        profilesArea.innerHTML = `<div style="text-align:center; padding:50px; color:#aaa;">Veriler yükleniyor veya sunucu meşgul...<br>Lütfen bekleyin.</div>`;
     }
 }
 
@@ -47,22 +47,23 @@ function createProfileCard(user) {
             const card = document.createElement('div');
             card.classList.add('match-card', match.result);
 
-            // --- İTEMLERİ DİZME KISMI ---
+            // İTEMLERİ DİZ
             let itemsHtml = '';
             
-            // 1. Gerçek İtemleri Ekle
+            // 1. Gelen itemleri ekle
             if (match.items) {
                 match.items.forEach(itemUrl => {
-                    // DİKKAT: Buraya yorum satırı ekleme, direkt kodu yazıyoruz
+                    // DİKKAT: Eğer resim yüklenemezse (onerror), bu sefer kutuyu GİZLE (display:none).
+                    // Ama parent elementi (item-slot) gizlememiz lazım ki boşluk kalmasın.
                     itemsHtml += `
                         <div class="item-slot">
-                            <img src="${itemUrl}" class="item-img" alt="Item" onerror="this.style.display='none'">
+                            <img src="${itemUrl}" class="item-img" alt="Item" onerror="this.parentElement.style.display='none'">
                         </div>
                     `;
                 });
             }
 
-            // 2. Kalanları Boş Kutuyla Doldur (Toplam 7 Slot)
+            // 2. Kalanları boş kutuyla doldur (7'ye tamamla)
             const currentCount = match.items ? match.items.length : 0;
             for (let i = currentCount; i < 7; i++) {
                 itemsHtml += `<div class="item-slot empty"></div>`;
@@ -89,7 +90,7 @@ function createProfileCard(user) {
             matchesContainer.appendChild(card);
         });
     } else {
-        matchesContainer.innerHTML = "<p style='text-align:center; color:#777;'>Maç verisi yok.</p>";
+        matchesContainer.innerHTML = "<p style='text-align:center; color:#777;'>Maç verisi bulunamadı.</p>";
     }
 
     profilesArea.appendChild(profileSection);
