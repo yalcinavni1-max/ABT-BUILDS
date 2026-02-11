@@ -87,6 +87,7 @@ def scrape_summoner(url):
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
                 
+                # Yedek Şampiyon Bulucu
                 if champ_key == "Poro":
                     imgs = row.find_all("img")
                     for img in imgs:
@@ -97,32 +98,22 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (AKILLI TARAMA)
+                # 2. İTEMLER (NOKTA ATIŞI - KESİN ÇÖZÜM)
                 items = []
-                img_tags = row.find_all("img")
+                row_html = str(row) # Satırın tüm kodunu al
                 
-                for img in img_tags:
-                    # Resmin linkini al (src veya data-src)
-                    src = img.get("src") or img.get("data-src") or ""
-                    
-                    # FİLTRE 1: Şampiyon, Büyü, Rün, Rol ikonlarını atla
-                    if any(x in src for x in ["champion", "summoner", "spell", "perk", "rune", "role", "class"]):
-                        continue
-                    
-                    # FİLTRE 2: Linkin içindeki TÜM 4 haneli sayıları bul
-                    # (width="64" gibi HTML kodlarını almaz, çünkü sadece 'src' içine bakıyoruz)
-                    candidates = re.findall(r"(\d{4})", src)
-                    
-                    for num in candidates:
-                        val = int(num)
+                # Regex: SADECE "/items/.../1234.png" formatına uyanları al.
+                # Bu sayede width="64" gibi sayıları ASLA almaz.
+                candidates = re.findall(r"items/[^\"\'\s]+?(\d{4})\.png", row_html)
+                
+                for num in candidates:
+                    val = int(num)
+                    if 1000 <= val <= 8000:
+                        # Rünler ve Yıllar hariç (5000-5999 genelde ründür)
+                        if 5000 <= val < 6000: continue
+                        if 2020 <= val <= 2030: continue
                         
-                        # FİLTRE 3: Mantıklı İtem Aralığı (1000 - 8000)
-                        if 1000 <= val <= 8000:
-                            if 2020 <= val <= 2030: continue # Yıl klasörleri (2024 vb.)
-                            if 5000 <= val < 6000: continue # Rün ID'leri
-                            
-                            # Geçerli item!
-                            items.append(f"{RIOT_CDN}/item/{val}.png")
+                        items.append(f"{RIOT_CDN}/item/{val}.png")
 
                 # Tekrarları temizle
                 clean_items = []
@@ -132,6 +123,7 @@ def scrape_summoner(url):
                         clean_items.append(x)
                         seen.add(x)
                 
+                # 7 İtem Limiti
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
@@ -167,5 +159,4 @@ def get_all_users():
     return jsonify(all_data)
 
 if __name__ == '__main__':
-    # Debug modu kapalı, host 0.0.0.0
     app.run(host='0.0.0.0', port=5000)
