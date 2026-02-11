@@ -81,18 +81,18 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
 .champ-name { font-size: 1.1rem; font-weight: bold; display: block; }
 .game-mode { font-size: 0.8rem; color: #aaa; }
 
-/* İTEMLER IZGARASI - KESİN ÇÖZÜM */
+/* İTEMLER IZGARASI */
 .items-grid {
     display: flex;
     gap: 2px;
-    flex-wrap: nowrap; /* Asla alt satıra geçme */
-    justify-content: flex-start; /* Sola yasla */
+    flex-wrap: nowrap;
+    justify-content: flex-start;
     
-    /* Genişliği arttırıyoruz */
+    /* BURASI ÇOK ÖNEMLİ */
     width: 300px;
     min-width: 300px;
     
-    overflow: visible; /* Gizleme, dışarı taşsa bile göster */
+    overflow: visible;
 }
 
 /* İtem slotlarının boyutunu sabitleyelim */
@@ -131,6 +131,7 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
 .profile-text {
     text-align: left;
 }
+
 
 
 
