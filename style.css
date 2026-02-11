@@ -1,6 +1,5 @@
 body {
-    /* GitHub'daki 'ragnar.jpg' dosyasını kullan */
-    /* Dosya adı tam olarak 'ragnar.jpg' olmalı */
+    /* Arka Plan (Dosya adının ragnar.jpg olduğundan eminsin) */
     background: #0a0a0c url('ragnar.jpg') no-repeat center center fixed;
     background-size: cover;
     
@@ -17,7 +16,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.85); /* Karartma */
+    background: rgba(0, 0, 0, 0.85);
     z-index: 1;
 }
 
@@ -41,7 +40,6 @@ h1 {
     text-shadow: 0 0 10px rgba(240, 230, 210, 0.5);
 }
 
-/* PROFİL KISMI */
 .user-section {
     margin-bottom: 60px;
     padding-bottom: 20px;
@@ -74,7 +72,6 @@ h1 {
     font-size: 0.9rem;
 }
 
-/* MAÇ KARTLARI */
 .match-card {
     display: flex;
     justify-content: space-between;
@@ -131,8 +128,9 @@ h1 {
     gap: 2px;
     flex-wrap: nowrap;
     justify-content: flex-start;
-    width: 300px;
-    min-width: 300px;
+    /* GENİŞLİĞİ ARTTIRDIK: 320px */
+    width: 320px;
+    min-width: 320px;
     overflow: visible;
 }
 
