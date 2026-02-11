@@ -84,10 +84,11 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
 /* İTEMLER IZGARASI */
 .items-grid {
     display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-    justify-content: flex-start; /* ÖNEMLİ: İtemleri sola yaslar, böylece boşluk kapanır */
-    width: 260px;
+    gap: 3px; /* Boşlukları biraz azalttık ki sığsın */
+    flex-wrap: nowrap; /* ÖNEMLİ: Asla alt satıra geçme, yan yana dur */
+    justify-content: flex-start; /* Sola yasla */
+    width: 280px; /* Genişliği artırdık (Eskiden 260px idi) */
+    overflow: hidden; /* Taşarsa gizle ama nowrap sayesinde taşmaz */
 }
 
 /* Kutu Stili */
@@ -109,3 +110,4 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
 .result-text { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; }
 
 .kda-text { font-size: 1rem; color: #ccc; }
+
