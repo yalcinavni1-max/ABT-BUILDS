@@ -81,32 +81,34 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
 .champ-name { font-size: 1.1rem; font-weight: bold; display: block; }
 .game-mode { font-size: 0.8rem; color: #aaa; }
 
-/* İTEMLER IZGARASI */
+/* İTEMLER IZGARASI - KESİN ÇÖZÜM */
 .items-grid {
     display: flex;
-    gap: 2px; /* Boşluk az olsun ki sığsın */
+    gap: 2px;
     flex-wrap: nowrap; /* Asla alt satıra geçme */
     justify-content: flex-start; /* Sola yasla */
     
-    /* EN ÖNEMLİ KISIM BURASI: */
-    width: 290px; /* Genişliği 290px yaptık */
-    min-width: 290px; 
+    /* Genişliği arttırıyoruz */
+    width: 300px;
+    min-width: 300px;
     
-    overflow: visible; /* Gizleme, göster */
+    overflow: visible; /* Gizleme, dışarı taşsa bile göster */
 }
-/* Kutu Stili */
+
+/* İtem slotlarının boyutunu sabitleyelim */
 .item-slot {
-    width: 32px;
-    height: 32px;
-    border-radius: 4px;
-    background: rgba(0,0,0,0.4); /* Boş kutu rengi */
+    width: 35px;
+    height: 35px;
     border: 1px solid #444;
-    overflow: hidden;
+    background: #111;
+    border-radius: 4px;
+    flex-shrink: 0; /* Sıkışmayı önler */
 }
 
 .item-img {
     width: 100%;
     height: 100%;
+    border-radius: 4px;
 }
 
 .stats { text-align: right; width: 100px; }
@@ -129,6 +131,7 @@ h1 { font-size: 3rem; margin: 0 0 20px 0; color: #f0e6d2; }
 .profile-text {
     text-align: left;
 }
+
 
 
 
