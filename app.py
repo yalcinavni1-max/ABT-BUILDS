@@ -7,7 +7,7 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# Takip Listesi
+# Takip Edilecek Hesaplar
 URL_LISTESI = [
     "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138",
     "https://www.leagueofgraphs.com/summoner/tr/D%C3%96L+VE+OKS%C4%B0JEN-011"
@@ -69,7 +69,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # Şampiyon Bulma (Eski Sağlam Yöntem)
+                # --- ŞAMPİYON BULMA (ESKİ SAĞLAM YÖNTEM) ---
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -89,20 +89,24 @@ def scrape_summoner(url):
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
                 
+                # Yedek yöntem (Eğer linkten bulamazsa)
+                if champ_key == "Poro":
+                    imgs = row.find_all("img")
+                    for img in imgs:
+                        alt = img.get("alt", "")
+                        if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold"]:
+                            champ_key = alt.replace(" ", "").replace("'", "").replace(".", "")
+                            break
+
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # --- İTEM BULMA (Eski Sağlam Yöntem) ---
+                # --- İTEM BULMA (ESKİ SAĞLAM YÖNTEM) ---
                 items = []
                 img_tags = row.find_all("img")
-                
                 for img in img_tags:
                     img_str = str(img)
-                    # Gereksiz resimleri ele
-                    if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str:
-                        continue
-                    
+                    if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str: continue
                     candidates = re.findall(r"(\d{4})", img_str)
-                    
                     for num in candidates:
                         val = int(num)
                         # Filtreler
