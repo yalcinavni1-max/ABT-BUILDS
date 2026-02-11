@@ -36,7 +36,7 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # --- PROFİL BİLGİLERİ ---
+        # 1. KİMLİK BİLGİLERİ
         summoner_name = "Sihirdar"
         try:
             title = soup.find("title").text
@@ -58,7 +58,7 @@ def scrape_summoner(url):
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # --- MAÇLARI ÇEK ---
+        # 2. MAÇLARI ÇEK
         matches_info = []
         all_rows = soup.find_all("tr")
         
@@ -67,7 +67,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # 1. ŞAMPİYON BULMA
+                # --- ŞAMPİYON BULMA ---
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -87,7 +87,6 @@ def scrape_summoner(url):
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
                 
-                # Yedek şampiyon kontrolü
                 if champ_key == "Poro":
                     imgs = row.find_all("img")
                     for img in imgs:
@@ -98,43 +97,36 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLERİ BULMA (DEDEKTİF MODU)
+                # --- İTEM BULMA (VAKUM MODU) ---
                 items = []
-                # Satırdaki tüm resimleri al
-                img_tags = row.find_all("img")
+                row_html = str(row)
                 
-                for img in img_tags:
-                    # Resmin kaynağına bak (src veya data-src)
-                    src = img.get("src") or img.get("data-src") or ""
+                # HTML içindeki TÜM 4 haneli sayıları çek
+                candidates = re.findall(r"(\d{4})", row_html)
+                
+                for num in candidates:
+                    val = int(num)
                     
-                    # KURAL: Linkin içinde MUTLAKA "/item/" veya "/items/" geçmeli.
-                    # Bu sayede "boşluk resimleri", "yetenek ikonları" vs. elenir.
-                    if "/item/" in src or "/items/" in src:
+                    # FİLTRELER (Çok Önemli)
+                    if 1000 <= val <= 8000: # Sadece mantıklı item ID aralığı
                         
-                        # Linkin içinden 4 haneli ID'yi çek
-                        match = re.search(r"(\d{4})", src)
-                        if match:
-                            val = int(match.group(1))
-                            
-                            # ID kontrolü (Rünler ve yıllar karışmasın)
-                            if 1000 <= val <= 8000:
-                                if 2020 <= val <= 2030: continue
-                                if 5000 <= val < 6000: continue
-                                
-                                # Listeye ekle
-                                items.append(f"{RIOT_CDN}/item/{val}.png")
+                        # Bu sayılar item değil, HTML kodudur (Genişlik, Yıl vb.)
+                        if val in [1200, 1280, 1080, 1440, 1024, 2500, 1920, 1600, 1000]: continue
+                        if 2020 <= val <= 2030: continue # Yıllar
+                        if 5000 <= val < 6000: continue # Rünler
+                        if val == 7000: continue # Hatalı totem
+                        
+                        items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                # Aynı itemleri filtreleme (Set ile)
+                # Tekrarları temizle
                 clean_items = []
                 seen = set()
                 for x in items:
-                    # Aynı resim linkini 2 kere alma (LeagueGraphs bazen çift koyar)
                     if x not in seen:
                         clean_items.append(x)
                         seen.add(x)
                 
-                # İlk 7 itemi al
-                clean_items = clean_items[:7]
+                clean_items = clean_items[:7] # İlk 7 tanesini al
 
                 kda_text = kda_div.text.strip()
                 result = "lose"
