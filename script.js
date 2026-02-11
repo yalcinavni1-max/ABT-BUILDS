@@ -1,77 +1,93 @@
-const container = document.getElementById('matches-container');
-const profileIcon = document.getElementById('profile-icon');
-const summonerName = document.getElementById('summoner-name');
-const rankDisplay = document.getElementById('rank-display');
+const profilesArea = document.getElementById('profiles-area');
 
 async function fetchMatches() {
     try {
+        // API artık bir liste ([User1, User2]) döndürüyor
         const response = await fetch('/api/get-ragnar');
-        const data = await response.json();
+        const usersData = await response.json();
 
-        if (data.summoner) summonerName.innerText = data.summoner;
-        if (data.rank) rankDisplay.innerText = data.rank;
-        if (data.icon) profileIcon.src = data.icon;
+        // Yükleniyor yazısını temizle
+        profilesArea.innerHTML = '';
 
-        if (data.matches && data.matches.length > 0) {
-            renderMatches(data.matches);
-        } else {
-            container.innerHTML = "<p style='text-align:center;'>Maç verisi yok.</p>";
-        }
+        // Gelen her kullanıcı için döngü
+        usersData.forEach(user => {
+            createProfileCard(user);
+        });
 
     } catch (error) {
         console.error("Hata:", error);
-        container.innerHTML = "<p style='text-align:center;'>Python sunucusu kapalı olabilir.</p>";
+        profilesArea.innerHTML = "<p style='text-align:center;'>Sunucuya bağlanılamadı.</p>";
     }
 }
 
-function renderMatches(matches) {
-    container.innerHTML = '';
+function createProfileCard(user) {
+    // 1. Profil Kapsayıcısı (Kutusu)
+    const profileSection = document.createElement('div');
+    profileSection.classList.add('user-section');
 
-    matches.forEach(match => {
-        const card = document.createElement('div');
-        card.classList.add('match-card', match.result);
+    // 2. Profil Başlığı (Resim, İsim, Rank)
+    const headerHtml = `
+        <div class="profile-header">
+            <img src="${user.icon}" class="profile-icon" alt="Icon">
+            <div class="profile-text">
+                <div class="summoner-name-style">${user.summoner}</div>
+                <div class="rank-text">${user.rank}</div>
+            </div>
+        </div>
+        <div class="matches-container"></div>
+    `;
+    
+    profileSection.innerHTML = headerHtml;
+    
+    // Maçları ekleyelim
+    const matchesContainer = profileSection.querySelector('.matches-container');
 
-        // İtemleri oluştur
-        let itemsHtml = '';
-        
-       // Gelen itemler
-        match.items.forEach(itemUrl => {
-            // DEĞİŞİKLİK BURADA: Resim hataya düşerse (onerror), .remove() komutuyla o kutuyu komple siliyoruz.
-            itemsHtml += `
-                <div class="item-slot">
-                    <img src="${itemUrl}" class="item-img" alt="Item" onerror="this.closest('.item-slot').remove()">
+    if (user.matches && user.matches.length > 0) {
+        user.matches.forEach(match => {
+            const card = document.createElement('div');
+            card.classList.add('match-card', match.result);
+
+            // İtemleri oluştur
+            let itemsHtml = '';
+            match.items.forEach(itemUrl => {
+                itemsHtml += `
+                    <div class="item-slot">
+                        <img src="${itemUrl}" class="item-img" alt="Item" onerror="this.closest('.item-slot').remove()">
+                    </div>
+                `;
+            });
+
+            // 7'ye tamamla (Boş kutular)
+            for (let i = match.items.length; i < 7; i++) {
+                itemsHtml += `<div class="item-slot empty"></div>`;
+            }
+
+            card.innerHTML = `
+                <div class="champ-info">
+                    <img src="${match.img}" class="champ-img" alt="${match.champion}" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/champion/Poro.png'">
+                    <div>
+                        <span class="champ-name">${match.champion}</span>
+                        <span class="game-mode">Dereceli</span>
+                    </div>
+                </div>
+                
+                <div class="items-grid">
+                    ${itemsHtml}
+                </div>
+
+                <div class="stats">
+                    <div class="result-text">${match.result.toUpperCase()}</div>
+                    <div class="kda-text">${match.kda}</div>
                 </div>
             `;
+            matchesContainer.appendChild(card);
         });
+    } else {
+        matchesContainer.innerHTML = "<p style='text-align:center; color:#777;'>Maç verisi bulunamadı.</p>";
+    }
 
-        // 7'ye tamamlamak için boş kutular ekle
-        // BURASI ÖNEMLİ: Sayı 7 olmalı (6 değil)
-        for (let i = match.items.length; i < 7; i++) {
-            itemsHtml += `<div class="item-slot empty"></div>`;
-        }
-        card.innerHTML = `
-            <div class="champ-info">
-                <img src="${match.img}" class="champ-img" alt="${match.champion}" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/champion/Poro.png'">
-                <div>
-                    <span class="champ-name">${match.champion}</span>
-                    <span class="game-mode">Dereceli</span>
-                </div>
-            </div>
-            
-            <div class="items-grid">
-                ${itemsHtml}
-            </div>
-
-            <div class="stats">
-                <div class="result-text">${match.result.toUpperCase()}</div>
-                <div class="kda-text">${match.kda}</div>
-            </div>
-        `;
-        container.appendChild(card);
-    });
+    // Oluşturulan kartı ana ekrana ekle
+    profilesArea.appendChild(profileSection);
 }
 
-
 fetchMatches();
-
-
