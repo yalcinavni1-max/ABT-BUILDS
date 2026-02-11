@@ -25,31 +25,25 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
-# Oturum (Session) başlatıyoruz
+# Oturumu koru
 session = requests.Session()
 
 def scrape_summoner(url):
-    # Siteyi kızdırmamak için bekleme süresi
-    time.sleep(random.uniform(2.0, 4.0))
+    # Siteyi kızdırmamak için bekleme
+    time.sleep(random.uniform(1.5, 3.0))
     
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
-    # Masaüstü Chrome taklidi yapıyoruz
+    # Standart Tarayıcı Başlığı
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9,tr;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
         "Referer": "https://www.google.com/"
     }
     
     try:
         response = session.get(url, headers=headers, timeout=25)
-        
-        # Eğer site bizi engellediyse
-        if response.status_code != 200:
-            return {"error": f"Site Hatası: {response.status_code}", "summoner": "Veri Yok", "matches": []}
-
         soup = BeautifulSoup(response.content, 'html.parser')
 
         # --- PROFİL ---
@@ -80,7 +74,7 @@ def scrape_summoner(url):
         
         for row in all_rows:
             try:
-                # KDA'sı olmayan satırı atla
+                # KDA olmayan satırı atla
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
@@ -114,36 +108,38 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (HEDEF ODAKLI TARAMA)
+                # 2. İTEMLER (İMZA ARAMA TEKNİĞİ)
                 items = []
                 
-                # Sadece itemlerin bulunduğu sütunu (div class="items") bul.
-                # Bu sayede sayfadaki diğer sayılarla karışmaz.
-                items_container = row.find("div", class_="items")
+                # Satırın HTML kodunu metin olarak al
+                row_html = str(row)
                 
-                # Eğer div varsa onun içini tara, yoksa tüm satırı tara
-                search_area = str(items_container) if items_container else str(row)
+                # REGEX AÇIKLAMASI:
+                # League of Graphs itemleri genelde şöyle saklar: ".../img/items/64/1234.png"
+                # Biz "items/" yazısını gördüğümüz an takibe başlıyoruz ve oradaki 4 haneli sayıyı kapıyoruz.
+                # html etiketlerine bakmaksızın kodun içinden ID çeker.
                 
-                # Regex ile 4 haneli sayıları bul (Tırnak işaretleri arasındaki)
-                # Örnek: "3078" veya '3078' veya /3078
-                matches = re.findall(r'[\/\"\'](\d{4})[\.\"\'\/]', search_area)
+                # Kalıp 1: "items/..." içinde geçen sayılar
+                matches_path = re.findall(r"items\/[\w\/]*(\d{4})", row_html)
                 
-                for num in matches:
+                # Kalıp 2: Standart 4 haneli sayılar (Yedek)
+                matches_digits = re.findall(r"[\"\/](\d{4})\.png", row_html)
+                
+                # Hepsini birleştir
+                all_candidates = matches_path + matches_digits
+                
+                for num in all_candidates:
                     val = int(num)
                     
                     # FİLTRELER
                     if 1000 <= val <= 8000:
-                        # Yıl (2025)
-                        if 2020 <= val <= 2030: continue
-                        # Rün ID'leri
-                        if 5000 <= val < 6000: continue
-                        # Ekran Genişlikleri (Yasaklı Liste)
-                        if val in [1080, 1200, 1280, 1440, 1920, 2560, 1024]: continue
+                        if 2020 <= val <= 2030: continue # Yıllar
+                        if 5000 <= val < 6000: continue # Rünler
+                        if val in [1080, 1200, 1280, 1440, 1920]: continue # Ekran Boyutları
 
-                        # Riot CDN'den link oluştur
                         items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                # Tekrarları Temizle
+                # Tekrarları Temizle (Sırayı bozmadan)
                 clean_items = []
                 seen = set()
                 for x in items:
