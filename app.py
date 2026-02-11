@@ -36,13 +36,14 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # KİMLİK BİLGİLERİ
+        # İSİM
         summoner_name = "Sihirdar"
         try:
             title = soup.find("title").text
             summoner_name = title.split("(")[0].strip().replace(" - League of Legends", "")
         except: pass
 
+        # RANK
         rank_text = "Unranked"
         try:
             banner_sub = soup.find("div", class_="bannerSubtitle")
@@ -52,6 +53,7 @@ def scrape_summoner(url):
                 if tier: rank_text = tier.text.strip()
         except: pass
 
+        # İKON
         profile_icon = f"{RIOT_CDN}/profileicon/29.png"
         try:
             img = soup.find("div", class_="img").find("img")
@@ -97,21 +99,31 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # İTEMLER (EN GÜVENLİ YÖNTEM)
+                # --- İTEM BULMA (YENİ TAG-BASED YÖNTEM) ---
                 items = []
-                row_html = str(row)
-                candidates = re.findall(r"(\d{4})", row_html)
+                # Sadece resim etiketlerini gez (HTML içindeki sayıları gezme)
+                img_tags = row.find_all("img")
                 
-                for num in candidates:
-                    val = int(num)
-                    if 1000 <= val <= 8000:
-                        # KARA LİSTE (Boşluk yapan sayılar)
-                        if val in [1200, 1280, 1080, 1440, 1024, 2500, 1920]: continue
-                        if 2020 <= val <= 2030: continue
-                        if 5000 <= val < 6000: continue
-                        if val == 7000: continue
+                for img in img_tags:
+                    src = img.get("src", "")
+                    
+                    # Filtre 1: İçinde "champion", "spell", "perk" geçenleri at
+                    if any(x in src for x in ["champion", "spell", "perk", "runes", "summoner"]):
+                        continue
                         
-                        items.append(f"{RIOT_CDN}/item/{val}.png")
+                    # Regex ile sadece 4 haneli sayıları çek
+                    match = re.search(r"(\d{4})", src)
+                    if match:
+                        val = int(match.group(1))
+                        
+                        # Filtre 2: Mantıklı item aralığı
+                        if 1000 <= val <= 8000:
+                            # 2024, 2025 gibi yıl sayılarını ele
+                            if 2020 <= val <= 2030: continue
+                            # 5000-6000 arası genelde ründür
+                            if 5000 <= val < 6000: continue
+                            
+                            items.append(f"{RIOT_CDN}/item/{val}.png")
 
                 clean_items = []
                 seen = set()
@@ -119,6 +131,7 @@ def scrape_summoner(url):
                     if x not in seen:
                         clean_items.append(x)
                         seen.add(x)
+                
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
