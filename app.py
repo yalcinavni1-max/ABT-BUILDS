@@ -26,18 +26,16 @@ def get_latest_version():
     return "14.3.1"
 
 def scrape_summoner(url):
-    # Engel yememek için rastgele bekleme
-    time.sleep(random.uniform(1.5, 3.5))
+    # Siteyi yormamak ve engel yememek için bekleme
+    time.sleep(random.uniform(1.0, 2.5))
     
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
-    # TEKRAR MASAÜSTÜ (PC) MODUNA DÖNÜYORUZ
-    # Çünkü iPhone modu HTML yapısını bozdu.
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
     }
     
     try:
@@ -72,11 +70,10 @@ def scrape_summoner(url):
         
         for row in all_rows:
             try:
-                # KDA kontrolü (Boş satırları atla)
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # 1. ŞAMPİYON BULMA (Eski Sağlam Yöntem)
+                # 1. ŞAMPİYON
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -106,27 +103,45 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (TEXT OKUMA MODU)
-                # HTML yapısına (div, img, src) bakmaksızın, satırın kodunu düz yazı gibi okuyoruz.
+                # 2. İTEMLER (HİBRİT TOPLAYICI)
                 items = []
-                row_html = str(row) # Satırı metne çevir
                 
-                # Regex: 4 haneli sayıları bul (Tüm HTML içinde)
-                matches = re.findall(r"(\d{4})", row_html)
+                # Sadece itemlerin olduğu özel kutuyu buluyoruz.
+                # League of Graphs'ta bu genelde "items" class'ına sahip bir div'dir.
+                items_container = row.find("div", class_="items")
                 
-                for num in matches:
-                    val = int(num)
+                # Eğer özel kutu yoksa satırın tamamına bak (Yedek Plan)
+                search_area = items_container if items_container else row
+                
+                # O alandaki tüm resimleri bul
+                img_tags = search_area.find_all("img")
+                
+                for img in img_tags:
+                    # Resmin tüm olası kaynaklarını tek bir metinde birleştir
+                    full_tag = str(img) + img.get("src", "") + img.get("data-original", "")
                     
-                    # FİLTRELER (Çok Sıkı Tutuyoruz)
-                    if 1000 <= val <= 8000:
-                        # Yıl (2025)
-                        if 2020 <= val <= 2030: continue
-                        # Rün ID'leri
-                        if 5000 <= val < 6000: continue
-                        # Ekran/Resim Boyutları (CSS kodlarında geçer)
-                        if val in [1080, 1200, 1280, 1440, 1920, 2560, 1024, 1600]: continue
+                    # 1. ELEME: Şampiyon, Rün, Büyü resimlerini direkt atla
+                    if any(x in full_tag for x in ["champion", "spell", "perk", "rune", "class", "role", "summoner"]):
+                        continue
 
-                        items.append(f"{RIOT_CDN}/item/{val}.png")
+                    # 2. ARAMA: İçindeki 4 haneli sayıyı bul
+                    # Regex sadece sayıyı alır, uzantıya (.png) bakmaz.
+                    match = re.search(r"(\d{4})", full_tag)
+                    
+                    if match:
+                        val = int(match.group(1))
+                        
+                        # 3. DOĞRULAMA: Sayı mantıklı bir item ID'si mi?
+                        if 1000 <= val <= 8000:
+                            # 2024, 2025 (Yıl) -> Çöp
+                            if 2020 <= val <= 2030: continue
+                            # 5000-6000 (Rün) -> Çöp
+                            if 5000 <= val < 6000: continue
+                            # Ekran Genişlikleri -> Çöp
+                            if val in [1080, 1200, 1280, 1440, 1920]: continue
+                            
+                            # ALTIN VURUŞ: Riot'un temiz sunucusundan resmi oluştur
+                            items.append(f"{RIOT_CDN}/item/{val}.png")
 
                 # Tekrarları Temizle
                 clean_items = []
@@ -136,7 +151,7 @@ def scrape_summoner(url):
                         clean_items.append(x)
                         seen.add(x)
                 
-                # İlk 7 itemi al
+                # 7 İtem Limiti
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
