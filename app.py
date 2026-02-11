@@ -36,7 +36,7 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # KİMLİK
+        # --- KİMLİK BİLGİLERİ ---
         summoner_name = "Sihirdar"
         try:
             title = soup.find("title").text
@@ -58,7 +58,7 @@ def scrape_summoner(url):
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # MAÇLAR
+        # --- MAÇLARI ÇEK ---
         matches_info = []
         all_rows = soup.find_all("tr")
         
@@ -67,7 +67,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # ŞAMPİYON
+                # 1. ŞAMPİYON BULMA
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -97,40 +97,32 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # --- İTEM BULMA (DEDEKTİF MODU V2) ---
+                # 2. İTEM BULMA (KESKİN NİŞANCI MODU)
                 items = []
-                img_tags = row.find_all("img")
+                row_html = str(row) # Satırın tüm kodunu metin olarak al
                 
-                for img in img_tags:
-                    # Resmin saklanabileceği tüm yerlere bak (src, data-src, data-original)
-                    possible_urls = []
-                    if img.get("src"): possible_urls.append(img.get("src"))
-                    if img.get("data-src"): possible_urls.append(img.get("data-src"))
-                    if img.get("data-original"): possible_urls.append(img.get("data-original"))
+                # Regex Açıklaması: "items/" kelimesini bul, arada ne varsa geç, 4 haneli sayıyı (.png ile biten) yakala.
+                # Bu yöntem HTML taglerine bakmaz, direkt dosya isimlerini avlar.
+                # Örnek Hedef: .../img/items/14.3/64/6672.png -> 6672'yi alır.
+                candidates = re.findall(r"items/[^\"\'\s]+?(\d{4})\.png", row_html)
+                
+                for num in candidates:
+                    val = int(num)
                     
-                    for url in possible_urls:
-                        # KRİTİK KONTROL: Linkin içinde "/item/" geçiyor mu?
-                        # Geçmiyorsa bu bir item değildir, atla.
-                        if "/item/" in url or "/items/" in url:
-                            match = re.search(r"(\d{4})", url)
-                            if match:
-                                val = int(match.group(1))
-                                # Mantıklı item aralığı kontrolü
-                                if 1000 <= val <= 8000:
-                                    if 2020 <= val <= 2030: continue # Yılları ele
-                                    if 5000 <= val < 6000: continue # Rünleri ele
-                                    
-                                    # Bulduk! Listeye ekle ve bu resim için aramayı bitir.
-                                    items.append(f"{RIOT_CDN}/item/{val}.png")
-                                    break 
+                    if 1000 <= val <= 8000:
+                        if 2020 <= val <= 2030: continue
+                        if 5000 <= val < 6000: continue
+                        
+                        items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                # Tekrarları temizle ve ilk 7'yi al
+                # Tekrarları temizle
                 clean_items = []
                 seen = set()
                 for x in items:
                     if x not in seen:
                         clean_items.append(x)
                         seen.add(x)
+                
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
