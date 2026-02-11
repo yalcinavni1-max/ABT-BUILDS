@@ -16,7 +16,7 @@ async function fetchMatches() {
 
     } catch (error) {
         console.error("Hata:", error);
-        profilesArea.innerHTML = `<div style="text-align:center; padding:50px; color:#aaa;">Veriler yükleniyor veya sunucu meşgul...<br>Lütfen bekleyin.</div>`;
+        profilesArea.innerHTML = `<div style="text-align:center; padding:50px; color:#aaa;">Veriler yükleniyor...<br>Lütfen bekleyin.</div>`;
     }
 }
 
@@ -47,14 +47,11 @@ function createProfileCard(user) {
             const card = document.createElement('div');
             card.classList.add('match-card', match.result);
 
-            // İTEMLERİ DİZ
             let itemsHtml = '';
             
-            // 1. Gelen itemleri ekle
+            // 1. İtemleri Ekle
             if (match.items) {
                 match.items.forEach(itemUrl => {
-                    // DİKKAT: Eğer resim yüklenemezse (onerror), bu sefer kutuyu GİZLE (display:none).
-                    // Ama parent elementi (item-slot) gizlememiz lazım ki boşluk kalmasın.
                     itemsHtml += `
                         <div class="item-slot">
                             <img src="${itemUrl}" class="item-img" alt="Item" onerror="this.parentElement.style.display='none'">
@@ -63,8 +60,9 @@ function createProfileCard(user) {
                 });
             }
 
-            // 2. Kalanları boş kutuyla doldur (7'ye tamamla)
+            // 2. Boşlukları Doldur (DÖNGÜ: 7 OLMALI)
             const currentCount = match.items ? match.items.length : 0;
+            // Buradaki 7 sayısı slot sayısını belirler. 
             for (let i = currentCount; i < 7; i++) {
                 itemsHtml += `<div class="item-slot empty"></div>`;
             }
