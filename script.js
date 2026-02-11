@@ -44,11 +44,11 @@ function renderMatches(matches) {
             `;
         });
 
-        // 7'ye tamamlamak için boş kutular ekle (Düzen bozulmasın diye)
+        // 7'ye tamamlamak için boş kutular ekle
+        // BURASI ÖNEMLİ: Sayı 7 olmalı (6 değil)
         for (let i = match.items.length; i < 7; i++) {
             itemsHtml += `<div class="item-slot empty"></div>`;
         }
-
         card.innerHTML = `
             <div class="champ-info">
                 <img src="${match.img}" class="champ-img" alt="${match.champion}" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/champion/Poro.png'">
@@ -73,4 +73,5 @@ function renderMatches(matches) {
 
 
 fetchMatches();
+
 
