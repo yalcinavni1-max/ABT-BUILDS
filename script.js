@@ -64,8 +64,7 @@ function createProfileCard(user) {
 
             card.innerHTML = `
                 <div class="champ-info">
-                    <img src="${match.img}" class="champ-img" alt="${match.champion}" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/champion/Poro.png'">
-                    <div>
+                    <img src="${itemUrl}" class="item-img" alt="Item" onerror="this.style.display='none'">
                         <span class="champ-name">${match.champion}</span>
                         <span class="game-mode">Dereceli</span>
                     </div>
@@ -91,3 +90,4 @@ function createProfileCard(user) {
 }
 
 fetchMatches();
+
