@@ -122,38 +122,33 @@ h1 {
     color: #888;
 }
 
-/* --- İTEM KUTULARI DÜZENLEMESİ --- */
-
+/* İTEMLER IZGARASI */
 .items-grid {
     display: flex;
-    gap: 4px; /* Kutular arası boşluk */
+    gap: 2px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    /* GENİŞLİĞİ ARTTIRDIK: 320px */
+    width: 320px;
+    min-width: 320px;
+    overflow: visible;
 }
 
 .item-slot {
-    width: 35px;  /* Sabit genişlik */
-    height: 35px; /* Sabit yükseklik */
-    background-color: #1e2328; /* LoL arayüzüne benzer koyu gri */
-    border: 1px solid #444;    /* İnce kenarlık */
+    width: 35px;
+    height: 35px;
+    border: 1px solid #444;
+    background: #111;
     border-radius: 4px;
-    overflow: hidden; /* Resim taşarsa gizle */
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    flex-shrink: 0;
 }
 
-/* İtem Resmi */
 .item-img {
     width: 100%;
     height: 100%;
-    object-fit: cover; /* Resmi kutuya sığdır */
-    display: block;
+    border-radius: 4px;
 }
 
-/* Boş slotlar için özel stil (Opsiyonel) */
-.item-slot.empty {
-    background-color: #16191d;
-}
 .stats {
     text-align: right;
     width: 80px;
@@ -169,121 +164,3 @@ h1 {
     color: #aaa;
     font-size: 0.9rem;
 }
-/* --- YENİ EKLENEN PUAN VE DETAY STİLLERİ --- */
-
-/* Kartın tıklanabilir olduğunu göster */
-.match-card {
-    cursor: pointer;
-    transition: transform 0.2s, background-color 0.2s;
-    flex-direction: column; /* İçeriği alt alta dizmek için */
-    align-items: stretch; /* Genişliği tam kullan */
-}
-
-.match-card:hover {
-    background-color: #2a2a2a; /* Üzerine gelince hafif renk değişimi */
-    transform: translateY(-2px);
-}
-
-/* Kartın Üst Kısmı (Eski Görünüm) */
-.match-summary {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-
-/* Şampiyon ve Puan Rozeti */
-.champ-container {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.score-badge {
-    font-size: 0.7rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-weight: bold;
-    margin-left: 5px;
-    display: inline-block;
-    min-width: 20px;
-    text-align: center;
-}
-
-/* Puan Renkleri */
-.score-mvp { background: #ffd700; color: #000; box-shadow: 0 0 5px #ffd700; }
-.score-s { background: #00bba3; color: #fff; }
-.score-a { background: #4caf50; color: #fff; }
-.score-b { background: #2196f3; color: #fff; }
-.score-c { background: #607d8b; color: #fff; }
-
-/* Gizli Detay Kutusu */
-.match-details {
-    display: none; /* Başlangıçta gizli */
-    padding: 15px;
-    background: rgba(0, 0, 0, 0.4);
-    border-top: 1px solid rgba(255,255,255,0.1);
-    animation: slideDown 0.3s ease;
-}
-
-/* Tıklayınca açılması için aktif sınıf */
-.match-card.active .match-details {
-    display: block;
-}
-
-.detail-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.9rem;
-    color: #ccc;
-    margin-bottom: 5px;
-}
-
-.detail-label {
-    color: #888;
-}
-
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-/* --- OYLAMA STİLLERİ --- */
-
-/* Puan Göstergesi (Yıldızlı Kısım) */
-.user-score-display {
-    font-size: 0.85rem;
-    font-weight: bold;
-    margin-top: 4px;
-}
-
-/* Oylama Butonları Kutusu */
-.vote-buttons-container {
-    display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-/* Tekil Puan Butonu */
-.vote-btn {
-    background: #333;
-    border: 1px solid #555;
-    color: white;
-    padding: 5px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 0.9rem;
-}
-
-.vote-btn:hover {
-    background: #00bba3;
-    border-color: #00bba3;
-    transform: scale(1.1);
-}
-
-/* Kartın içine biraz boşluk ekle */
-.match-details {
-    text-align: center;
-}
-
