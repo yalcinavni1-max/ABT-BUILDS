@@ -28,8 +28,8 @@ def get_latest_version():
 session = requests.Session()
 
 def scrape_summoner(url):
-    # Siteyi yormamak için kısa bekleme
-    time.sleep(random.uniform(1.0, 2.0))
+    # Siteyi kızdırmamak için bekleme
+    time.sleep(random.uniform(1.0, 2.5))
     
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
@@ -75,7 +75,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # 1. ŞAMPİYON
+                # 1. ŞAMPİYON BULMA
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -105,50 +105,44 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (DOSYA ADINDAN YAKALAMA TEKNİĞİ)
+                # 2. İTEMLER (METİN OKUMA MODU - KESİN ÇÖZÜM)
                 items = []
                 
-                # Sadece itemlerin bulunduğu alanı al
+                # İtemlerin olduğu kutuyu bul
                 items_container = row.find("div", class_="items")
                 
-                # Eğer özel alan yoksa tüm satıra bak
-                search_area = items_container if items_container else row
-                
-                # O alandaki TÜM resimleri bul
-                all_imgs = search_area.find_all("img")
-                
-                for img in all_imgs:
-                    # Resmin linkini al (src veya data-original)
-                    src = img.get("src") or img.get("data-original") or ""
+                if items_container:
+                    # Kutunun içindeki HTML kodunu tamamen DÜZ YAZIYA çevir
+                    # Böylece <img> etiketi mi, <div> mi, background mu diye düşünmeyiz.
+                    container_html = str(items_container)
                     
-                    if not src: continue
-
-                    # ÖNEMLİ FİLTRE:
-                    # Eğer linkin içinde "champion", "spell" (büyü), "perk" (rün) varsa direkt atla.
-                    if any(x in src for x in ["champion", "spell", "perk", "rune", "summoner", "class", "role"]):
-                        continue
+                    # Regex: Yazının içindeki tüm 4 haneli sayıları bul
+                    candidates = re.findall(r"(\d{4})", container_html)
                     
-                    # REGEX: Linkin SONUNDA yer alan 4 haneli sayıyı bul.
-                    # Örnek: .../img/v2/3078.png -> 3078'i alır.
-                    # Örnek: .../items/64/6672.webp -> 6672'yi alır.
-                    match = re.search(r"\/(\d{4})\.(png|jpg|webp)", src)
-                    
-                    if match:
-                        val = int(match.group(1))
+                    for num in candidates:
+                        val = int(num)
                         
-                        # ID KONTROLÜ
+                        # FİLTRELER (Gereksiz Sayıları Temizle)
                         if 1000 <= val <= 8000:
-                            # 2024, 2025 (Yıllar)
+                            # 2024, 2025 gibi yılları at
                             if 2020 <= val <= 2030: continue
-                            # 5000-6000 (Rünler)
+                            # 5000-5999 arası genelde rünlerdir, at
                             if 5000 <= val < 6000: continue
-                            # Bilinen ekran boyutları (HTML içinde geçebilir)
+                            # HTML genişlik/yükseklik kodlarını at (64, 48 vs zaten 1000 altı ama garanti olsun)
                             if val in [1080, 1200, 1280, 1440, 1920]: continue
                             
-                            # İşte bu gerçek bir item!
+                            # Geriye kalan sayı kesinlikle İTEMDİR.
                             items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                # Tekrarları temizle
+                # Eğer yukarıdaki yöntem bulamazsa (çok nadir), tüm satıra bak (Yedek)
+                if not items:
+                    matches = re.findall(r"items\/[\w\/]*(\d{4})", str(row))
+                    for num in matches:
+                        val = int(num)
+                        if 1000 <= val <= 8000 and not (5000 <= val < 6000):
+                             items.append(f"{RIOT_CDN}/item/{val}.png")
+
+                # Tekrarları Temizle
                 clean_items = []
                 seen = set()
                 for x in items:
