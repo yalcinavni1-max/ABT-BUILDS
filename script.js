@@ -31,7 +31,7 @@ async function sendVote(matchId, points, elementId) {
         
         const result = await response.json();
         
-        // Ekrana yeni puanı yaz
+        // Puanı güncelle
         const scoreElement = document.getElementById(elementId);
         if (scoreElement) {
             scoreElement.innerHTML = `<span style="color:#ffd700;">★ ${result.average}</span> <span style="font-size:0.7rem; color:#888;">(${result.count} oy)</span>`;
@@ -71,8 +71,9 @@ function createProfileCard(user) {
             const card = document.createElement('div');
             card.classList.add('match-card', match.result);
 
-            // Tıklayınca Açılma Olayı (Butonlara tıklayınca açılmasın)
+            // YENİ: Karta tıklayınca açılması için
             card.onclick = function(e) {
+                // Eğer butona tıklandıysa kartı açma/kapama
                 if(e.target.tagName === 'BUTTON') return;
                 this.classList.toggle('active');
             };
@@ -90,7 +91,7 @@ function createProfileCard(user) {
                 });
             }
 
-            // 2. Boşlukları Doldur (Senin kodundaki gibi 9 slot)
+            // 2. Boşlukları Doldur (9 SLOTLU SENİN AYARIN)
             const currentCount = match.items ? match.items.length : 0;
             for (let i = currentCount; i < 9; i++) {
                 itemsHtml += `<div class="item-slot empty"></div>`;
@@ -99,19 +100,19 @@ function createProfileCard(user) {
             // Puanlama ID'si
             const scoreDisplayId = `score-${name.replace(/\s/g, '')}-${index}`;
             
-            // Puan Butonlarını Oluştur (1-10 arası)
+            // Butonları oluştur
             let buttonsHtml = '';
             for(let i=1; i<=10; i++) {
                 buttonsHtml += `<button class="vote-btn" onclick="sendVote('${match.match_id}', ${i}, '${scoreDisplayId}')">${i}</button>`;
             }
 
             card.innerHTML = `
-                <div class="match-summary" style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
                     <div class="champ-info">
                         <img src="${match.img}" class="champ-img" alt="${match.champion}" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/champion/Poro.png'">
                         <div>
                             <span class="champ-name">${match.champion}</span>
-                            <div id="${scoreDisplayId}" class="user-score-display">
+                            <div id="${scoreDisplayId}" style="font-size:0.8rem; font-weight:bold; margin-top:2px;">
                                 <span style="color:#ffd700;">★ ${match.user_score || '-'}</span> 
                                 <span style="font-size:0.7rem; color:#888;">(${match.vote_count || 0} oy)</span>
                             </div>
@@ -129,7 +130,7 @@ function createProfileCard(user) {
                 </div>
 
                 <div class="match-details">
-                    <div style="margin-bottom:10px; color:#ccc; font-size:0.9rem;">Bu performansa puan ver:</div>
+                    <div style="margin-bottom:5px; color:#ccc; font-size:0.9rem;">Bu performansa puan ver:</div>
                     <div class="vote-buttons-container">
                         ${buttonsHtml}
                     </div>
