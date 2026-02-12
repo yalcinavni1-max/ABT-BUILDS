@@ -3,7 +3,7 @@ import time
 import random
 import json
 import os
-# 'request' modülü eklendi, bu olmadan oylama çalışmaz
+# DİKKAT: 'request' buraya eklendi, bu olmadan oylama çalışmaz!
 from flask import Flask, jsonify, send_from_directory, request 
 import requests
 from bs4 import BeautifulSoup
@@ -43,7 +43,7 @@ URL_LISTESI = [
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-# --- 2. OY VERME API'si ---
+# --- 2. OY VERME API'si (Eksik olan kısım burasıydı) ---
 @app.route('/api/vote', methods=['POST'])
 def submit_vote():
     try:
@@ -176,8 +176,8 @@ def scrape_summoner(url):
                 result = "lose"
                 if "Victory" in row.text or "Zafer" in row.text: result = "win"
                 
-                # --- 3. PUANLARI ÇEK ---
-                # Match ID'yi temizleyelim
+                # --- 3. PUANLARI ÇEK VE EKLE ---
+                # Match ID oluştururken Türkçe karakter ve boşlukları temizliyoruz
                 safe_id = f"{summoner_name}-{champ_key}-{kda_text}".replace(" ", "").replace("Ö", "O").replace("İ", "I")
                 
                 current_score = "-"
