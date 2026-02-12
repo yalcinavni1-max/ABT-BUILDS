@@ -16,27 +16,7 @@ async function fetchMatches() {
 
     } catch (error) {
         console.error("Hata:", error);
-        profilesArea.innerHTML = `<div style="text-align:center; padding:50px; color:#aaa;">Veriler yükleniyor...<br>Lütfen bekleyin.</div>`;
-    }
-}
-
-// Oy Gönderme Fonksiyonu (Aynen koruyoruz)
-async function sendVote(matchId, points, elementId) {
-    try {
-        const response = await fetch('/api/vote', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ match_id: matchId, points: points })
-        });
-        const result = await response.json();
-        
-        const scoreElement = document.getElementById(elementId);
-        if (scoreElement) {
-            scoreElement.innerHTML = `<span style="color:#ffd700;">★ ${result.average}</span> <span style="font-size:0.7rem; color:#888;">(${result.count} oy)</span>`;
-        }
-        alert("Puanın kaydedildi!");
-    } catch (error) {
-        alert("Hata oluştu.");
+        profilesArea.innerHTML = `<div style="text-align:center; padding:50px; color:#aaa;">Veriler yükleniyor...</div>`;
     }
 }
 
@@ -44,14 +24,13 @@ function createProfileCard(user) {
     const profileSection = document.createElement('div');
     profileSection.classList.add('user-section');
 
-    // Profil resmi ve bilgiler
     const icon = user.icon || "https://ddragon.leagueoflegends.com/cdn/14.3.1/img/profileicon/29.png";
     const name = user.summoner || "Sihirdar";
     const rank = user.rank || "Unranked";
 
     const headerHtml = `
         <div class="profile-header">
-            <img src="${icon}" class="profile-icon" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/profileicon/29.png'">
+            <img src="${icon}" class="profile-icon" alt="Icon" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/profileicon/29.png'">
             <div class="profile-text">
                 <div class="summoner-name-style">${name}</div>
                 <div class="rank-text">${rank}</div>
@@ -64,44 +43,30 @@ function createProfileCard(user) {
     const matchesContainer = profileSection.querySelector('.matches-container');
 
     if (user.matches && user.matches.length > 0) {
-        user.matches.forEach((match, index) => {
+        user.matches.forEach(match => {
             const card = document.createElement('div');
             card.classList.add('match-card', match.result);
 
-            card.onclick = function(e) {
-                if(e.target.tagName === 'BUTTON') return;
+            // Tıklayınca Detay Açma Olayı
+            card.onclick = function() {
                 this.classList.toggle('active');
             };
 
-            // --- İTEMLERİ DÜZENLEME (RESİM DÜZELTME KISMI) ---
             let itemsHtml = '';
-            
-            // Backend'den bazen 7'den fazla veya hatalı veri gelebilir.
-            // Biz burada MAX 7 tane kutu oluşturacağız.
-            const maxSlots = 7; 
-            const itemsList = match.items || [];
-
-            for (let i = 0; i < maxSlots; i++) {
-                if (i < itemsList.length) {
-                    // Resim varsa koy
-                    // ÖNEMLİ: onerror="this.style.display='none'"
-                    // Eğer resim yüklenemezse (404), resmi gizle -> Sadece gri kutu kalsın.
-                    itemsHtml += `
-                        <div class="item-slot">
-                            <img src="${itemsList[i]}" class="item-img" onerror="this.style.display='none'">
-                        </div>`;
-                } else {
-                    // Resim yoksa boş kutu koy
-                    itemsHtml += `<div class="item-slot empty"></div>`;
-                }
+            if (match.items) {
+                match.items.forEach(itemUrl => {
+                    itemsHtml += `<div class="item-slot"><img src="${itemUrl}" class="item-img" onerror="this.parentElement.style.display='none'"></div>`;
+                });
+            }
+            const currentCount = match.items ? match.items.length : 0;
+            for (let i = currentCount; i < 9; i++) {
+                itemsHtml += `<div class="item-slot empty"></div>`;
             }
 
-            // Puanlama ID'si
-            const scoreDisplayId = `score-${name.replace(/\s/g, '')}-${index}`;
-            let buttonsHtml = '';
-            for(let i=1; i<=10; i++) {
-                buttonsHtml += `<button class="vote-btn" onclick="sendVote('${match.match_id}', ${i}, '${scoreDisplayId}')">${i}</button>`;
-            }
+            // Puan Rengi Belirleme
+            let scoreClass = "score-gray";
+            if (match.score === "MVP" || match.score === "S") scoreClass = "score-gold";
+            else if (match.score === "A") scoreClass = "score-green";
 
             card.innerHTML = `
                 <div class="match-summary">
@@ -109,10 +74,7 @@ function createProfileCard(user) {
                         <img src="${match.img}" class="champ-img" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/champion/Poro.png'">
                         <div>
                             <span class="champ-name">${match.champion}</span>
-                            <div id="${scoreDisplayId}" class="user-score-display">
-                                <span style="color:#ffd700;">★ ${match.user_score || '-'}</span> 
-                                <span style="font-size:0.7rem; color:#888;">(${match.vote_count || 0} oy)</span>
-                            </div>
+                            <span class="score-badge ${scoreClass}">${match.score}</span>
                         </div>
                     </div>
                     
@@ -127,9 +89,12 @@ function createProfileCard(user) {
                 </div>
 
                 <div class="match-details">
-                    <div style="margin-bottom:10px; color:#ccc;">Bu performansa puan ver:</div>
-                    <div class="vote-buttons-container">
-                        ${buttonsHtml}
+                    <div class="detail-row">
+                        <span>Seviye: <strong>${match.level}</strong></span>
+                        <span>Minyon (CS): <strong>${match.cs}</strong></span>
+                    </div>
+                    <div class="detail-extra">
+                        Maç detaylarına gitmek için <a href="#" style="color:#00bba3;">LeagueOfGraphs</a> (Temsili)
                     </div>
                 </div>
             `;
