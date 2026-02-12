@@ -20,6 +20,30 @@ async function fetchMatches() {
     }
 }
 
+// YENİ: Oy Gönderme Fonksiyonu
+async function sendVote(matchId, points, elementId) {
+    try {
+        const response = await fetch('/api/vote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ match_id: matchId, points: points })
+        });
+        
+        const result = await response.json();
+        
+        // Ekrana yeni puanı yaz
+        const scoreElement = document.getElementById(elementId);
+        if (scoreElement) {
+            scoreElement.innerHTML = `<span style="color:#ffd700;">★ ${result.average}</span> <span style="font-size:0.7rem; color:#888;">(${result.count} oy)</span>`;
+        }
+        
+        alert("Puanın kaydedildi: " + points);
+        
+    } catch (error) {
+        alert("Oy verilirken hata oluştu.");
+    }
+}
+
 function createProfileCard(user) {
     const profileSection = document.createElement('div');
     profileSection.classList.add('user-section');
@@ -43,9 +67,15 @@ function createProfileCard(user) {
     const matchesContainer = profileSection.querySelector('.matches-container');
 
     if (user.matches && user.matches.length > 0) {
-        user.matches.forEach(match => {
+        user.matches.forEach((match, index) => {
             const card = document.createElement('div');
             card.classList.add('match-card', match.result);
+
+            // Tıklayınca Açılma Olayı (Butonlara tıklayınca açılmasın)
+            card.onclick = function(e) {
+                if(e.target.tagName === 'BUTTON') return;
+                this.classList.toggle('active');
+            };
 
             let itemsHtml = '';
             
@@ -60,29 +90,49 @@ function createProfileCard(user) {
                 });
             }
 
-            // 2. Boşlukları Doldur (DÖNGÜ: 7 OLMALI)
+            // 2. Boşlukları Doldur (Senin kodundaki gibi 9 slot)
             const currentCount = match.items ? match.items.length : 0;
-            // Buradaki 7 sayısı slot sayısını belirler. 
             for (let i = currentCount; i < 9; i++) {
                 itemsHtml += `<div class="item-slot empty"></div>`;
             }
 
+            // Puanlama ID'si
+            const scoreDisplayId = `score-${name.replace(/\s/g, '')}-${index}`;
+            
+            // Puan Butonlarını Oluştur (1-10 arası)
+            let buttonsHtml = '';
+            for(let i=1; i<=10; i++) {
+                buttonsHtml += `<button class="vote-btn" onclick="sendVote('${match.match_id}', ${i}, '${scoreDisplayId}')">${i}</button>`;
+            }
+
             card.innerHTML = `
-                <div class="champ-info">
-                    <img src="${match.img}" class="champ-img" alt="${match.champion}" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/champion/Poro.png'">
-                    <div>
-                        <span class="champ-name">${match.champion}</span>
-                        <span class="game-mode">Dereceli</span>
+                <div class="match-summary" style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                    <div class="champ-info">
+                        <img src="${match.img}" class="champ-img" alt="${match.champion}" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/champion/Poro.png'">
+                        <div>
+                            <span class="champ-name">${match.champion}</span>
+                            <div id="${scoreDisplayId}" class="user-score-display">
+                                <span style="color:#ffd700;">★ ${match.user_score || '-'}</span> 
+                                <span style="font-size:0.7rem; color:#888;">(${match.vote_count || 0} oy)</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="items-grid">
+                        ${itemsHtml}
+                    </div>
+
+                    <div class="stats">
+                        <div class="result-text">${match.result.toUpperCase()}</div>
+                        <div class="kda-text">${match.kda}</div>
                     </div>
                 </div>
-                
-                <div class="items-grid">
-                    ${itemsHtml}
-                </div>
 
-                <div class="stats">
-                    <div class="result-text">${match.result.toUpperCase()}</div>
-                    <div class="kda-text">${match.kda}</div>
+                <div class="match-details">
+                    <div style="margin-bottom:10px; color:#ccc; font-size:0.9rem;">Bu performansa puan ver:</div>
+                    <div class="vote-buttons-container">
+                        ${buttonsHtml}
+                    </div>
                 </div>
             `;
             matchesContainer.appendChild(card);
