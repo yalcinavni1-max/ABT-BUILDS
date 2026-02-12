@@ -3,7 +3,7 @@ import time
 import random
 import json
 import os
-# DİKKAT: 'request' buraya eklendi, yoksa oylama hatası verir.
+# 'request' modülü eklendi, bu olmadan oylama çalışmaz
 from flask import Flask, jsonify, send_from_directory, request 
 import requests
 from bs4 import BeautifulSoup
@@ -25,8 +25,11 @@ def load_votes():
         return {}
 
 def save_votes(votes):
-    with open(VOTE_FILE, 'w') as f:
-        json.dump(votes, f)
+    try:
+        with open(VOTE_FILE, 'w') as f:
+            json.dump(votes, f)
+    except:
+        pass
 
 votes_db = load_votes()
 
@@ -43,23 +46,26 @@ def serve_index():
 # --- 2. OY VERME API'si ---
 @app.route('/api/vote', methods=['POST'])
 def submit_vote():
-    data = request.json
-    match_id = data.get('match_id')
-    points = data.get('points')
+    try:
+        data = request.json
+        match_id = data.get('match_id')
+        points = data.get('points')
 
-    if not match_id or points is None:
-        return jsonify({"error": "Eksik bilgi"}), 400
+        if not match_id or points is None:
+            return jsonify({"error": "Eksik bilgi"}), 400
 
-    if match_id not in votes_db:
-        votes_db[match_id] = {"total": 0, "count": 0}
+        if match_id not in votes_db:
+            votes_db[match_id] = {"total": 0, "count": 0}
 
-    votes_db[match_id]["total"] += int(points)
-    votes_db[match_id]["count"] += 1
-    
-    save_votes(votes_db)
+        votes_db[match_id]["total"] += int(points)
+        votes_db[match_id]["count"] += 1
+        
+        save_votes(votes_db)
 
-    avg = votes_db[match_id]["total"] / votes_db[match_id]["count"]
-    return jsonify({"average": round(avg, 1), "count": votes_db[match_id]["count"]})
+        avg = votes_db[match_id]["total"] / votes_db[match_id]["count"]
+        return jsonify({"average": round(avg, 1), "count": votes_db[match_id]["count"]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 def get_latest_version():
     try:
@@ -171,19 +177,21 @@ def scrape_summoner(url):
                 if "Victory" in row.text or "Zafer" in row.text: result = "win"
                 
                 # --- 3. PUANLARI ÇEK ---
-                match_id = f"{summoner_name}-{champ_key}-{kda_text}".replace(" ", "")
+                # Match ID'yi temizleyelim
+                safe_id = f"{summoner_name}-{champ_key}-{kda_text}".replace(" ", "").replace("Ö", "O").replace("İ", "I")
+                
                 current_score = "-"
                 vote_count = 0
                 
-                if match_id in votes_db:
-                    total = votes_db[match_id]["total"]
-                    count = votes_db[match_id]["count"]
+                if safe_id in votes_db:
+                    total = votes_db[safe_id]["total"]
+                    count = votes_db[safe_id]["count"]
                     if count > 0:
                         current_score = round(total / count, 1)
                         vote_count = count
 
                 matches_info.append({
-                    "match_id": match_id,
+                    "match_id": safe_id,
                     "champion": champ_key,
                     "result": result,
                     "kda": kda_text,
