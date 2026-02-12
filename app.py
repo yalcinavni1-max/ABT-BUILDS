@@ -3,7 +3,8 @@ import time
 import random
 import json
 import os
-from flask import Flask, jsonify, send_from_directory, request # 'request' eklendi
+# DİKKAT: 'request' buraya eklendi, yoksa oylama hatası verir.
+from flask import Flask, jsonify, send_from_directory, request 
 import requests
 from bs4 import BeautifulSoup
 from flask_cors import CORS
@@ -11,7 +12,7 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# --- 1. OYLAMA SİSTEMİ ALTYAPISI (YENİ) ---
+# --- 1. OYLAMA SİSTEMİ ALTYAPISI ---
 VOTE_FILE = 'votes.json'
 
 def load_votes():
@@ -39,7 +40,7 @@ URL_LISTESI = [
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-# --- 2. OY VERME API'si (YENİ) ---
+# --- 2. OY VERME API'si ---
 @app.route('/api/vote', methods=['POST'])
 def submit_vote():
     data = request.json
@@ -67,7 +68,7 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
-# --- TEK BİR KULLANICIYI ÇEKEN FONKSİYON (SENİN KODUN) ---
+# --- TEK BİR KULLANICIYI ÇEKEN FONKSİYON ---
 def scrape_summoner(url):
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
@@ -81,7 +82,7 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # 1. İSİM VE RANK
+        # İSİM VE RANK
         summoner_name = "Bilinmeyen Sihirdar"
         try:
             title = soup.find("title").text
@@ -104,7 +105,7 @@ def scrape_summoner(url):
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # 2. MAÇLAR
+        # MAÇLAR
         matches_info = []
         all_rows = soup.find_all("tr")
         
@@ -143,7 +144,7 @@ def scrape_summoner(url):
                 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # İTEMLER (SENİN KODUN - 9 SLOTLU)
+                # İTEMLER
                 items = []
                 img_tags = row.find_all("img")
                 for img in img_tags:
@@ -163,13 +164,13 @@ def scrape_summoner(url):
                     if x not in seen:
                         clean_items.append(x)
                         seen.add(x)
-                clean_items = clean_items[:9] # Senin ayarın
+                clean_items = clean_items[:9]
 
                 kda_text = kda_div.text.strip()
                 result = "lose"
                 if "Victory" in row.text or "Zafer" in row.text: result = "win"
                 
-                # --- 3. PUANLARI HESAPLA (YENİ) ---
+                # --- 3. PUANLARI ÇEK ---
                 match_id = f"{summoner_name}-{champ_key}-{kda_text}".replace(" ", "")
                 current_score = "-"
                 vote_count = 0
@@ -182,14 +183,14 @@ def scrape_summoner(url):
                         vote_count = count
 
                 matches_info.append({
-                    "match_id": match_id, # Kimlik
+                    "match_id": match_id,
                     "champion": champ_key,
                     "result": result,
                     "kda": kda_text,
                     "img": final_champ_img,
                     "items": clean_items,
-                    "user_score": current_score, # Puan
-                    "vote_count": vote_count     # Oy Sayısı
+                    "user_score": current_score,
+                    "vote_count": vote_count
                 })
                 if len(matches_info) >= 5: break
             except: continue
