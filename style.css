@@ -267,3 +267,64 @@ h1 {
     background: #00bba3;
     border-color: #00bba3;
 }
+/* --- YENİ PUANLAMA STİLLERİ --- */
+
+.match-card {
+    cursor: pointer;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.match-details {
+    display: none; /* Başlangıçta gizli */
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.4); /* Daha koyu arka plan */
+    border-top: 1px solid rgba(255,255,255,0.1);
+    text-align: center;
+    margin-top: 8px;
+    border-radius: 0 0 6px 6px;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Aktif olunca göster */
+.match-card.active .match-details {
+    display: block;
+}
+
+.vote-buttons-container {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.vote-btn {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #eee;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: bold;
+    transition: all 0.2s;
+    min-width: 32px;
+}
+
+.vote-btn:hover {
+    background: #00bba3;
+    color: #000;
+    border-color: #00bba3;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+
+.vote-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
