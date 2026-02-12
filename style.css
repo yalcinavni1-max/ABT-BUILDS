@@ -1,9 +1,7 @@
-/* --- TEMEL SAYFA DÜZENİ --- */
+/* --- TEMEL SAYFA AYARLARI --- */
 body {
-    /* Arka plan resminizin adı 'ragnar.jpg' ise burası doğru */
     background: #0a0a0c url('ragnar.jpg') no-repeat center center fixed;
     background-size: cover;
-    
     min-height: 100vh;
     color: white;
     font-family: 'Roboto', sans-serif;
@@ -11,13 +9,10 @@ body {
     padding: 0;
 }
 
-/* Arka planı biraz karartan katman */
 .overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.85);
     z-index: 1;
 }
@@ -82,23 +77,18 @@ h1 {
 
 /* --- MAÇ KARTI --- */
 .match-card {
-    display: flex;
-    /* Puanlama detayının alta açılması için dikey hizalama */
-    flex-direction: column; 
-    align-items: stretch;
-    
+    background: #1e1e1e;
+    border-radius: 6px;
     padding: 10px 15px;
     margin-bottom: 8px;
-    border-radius: 6px;
-    background: #1e1e1e;
     border-left: 5px solid gray;
-    transition: transform 0.2s, background-color 0.2s;
-    cursor: pointer; /* Tıklanabilir olduğunu göster */
+    display: flex;
+    align-items: center;
+    transition: transform 0.2s;
 }
 
 .match-card:hover {
     transform: translateX(5px);
-    background-color: #252525;
 }
 
 .match-card.win {
@@ -111,7 +101,14 @@ h1 {
     border-left-color: #ff5859;
 }
 
-/* Şampiyon Bilgisi */
+.card-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+/* --- ŞAMPİYON VE NOT BÖLÜMÜ --- */
 .champ-info {
     display: flex;
     align-items: center;
@@ -128,16 +125,37 @@ h1 {
 .champ-name {
     display: block;
     font-weight: bold;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
+    margin-bottom: 3px;
 }
 
-/* İtemler Izgarası */
+/* NOT ROZETLERİ (S, A, B...) */
+.grade-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.85rem;
+    text-align: center;
+    min-width: 24px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+/* Not Renkleri */
+.grade-S { background: linear-gradient(135deg, #FFD700, #FFA500); color: black; border: 1px solid #fff; } /* Altın */
+.grade-A { background: #2deb90; color: black; } /* Yeşil */
+.grade-B { background: #3498db; color: white; } /* Mavi */
+.grade-C { background: #9b59b6; color: white; } /* Mor */
+.grade-D { background: #7f8c8d; color: white; } /* Gri */
+.grade-F { background: #c0392b; color: white; } /* Kırmızı */
+.grade-- { background: #333; color: #777; }     /* Belirsiz */
+
+/* --- İTEMLER --- */
 .items-grid {
     display: flex;
     gap: 2px;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    width: 320px; /* Genişliği sabitledik */
+    width: 320px;
     min-width: 320px;
 }
 
@@ -147,8 +165,8 @@ h1 {
     border: 1px solid #444;
     background: #111;
     border-radius: 4px;
-    flex-shrink: 0;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
 .item-img {
@@ -157,94 +175,7 @@ h1 {
     object-fit: cover;
 }
 
-/* İstatistikler (KDA vb.) */
-.stats {
-    text-align: right;
-    width: 80px;
-}
-
-.result-text {
-    font-weight: bold;
-    font-size: 1rem;
-    margin-bottom: 2px;
-}
-
-.kda-text {
-    color: #aaa;
-    font-size: 0.9rem;
-}
-
-/* --- YENİ EKLENEN PUANLAMA VE DETAY BÖLÜMÜ --- */
-
-/* Gizli Detay Kutusu */
-.match-details {
-    display: none; /* Başlangıçta gizli */
-    padding: 15px;
-    background: rgba(0, 0, 0, 0.4); /* Koyu yarı saydam arka plan */
-    border-top: 1px solid rgba(255,255,255,0.1);
-    text-align: center;
-    margin-top: 8px;
-    border-radius: 0 0 6px 6px;
-    animation: slideDown 0.3s ease-out;
-}
-
-/* Karta tıklandığında (.active sınıfı gelince) göster */
-.match-card.active .match-details {
-    display: block;
-}
-
-/* Açılma Animasyonu */
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Oylama Butonlarını Saran Kutu */
-.vote-buttons-container {
-    display: flex;
-    gap: 6px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin-top: 5px;
-}
-
-/* Oy Butonları */
-.vote-btn {
-    background: #2a2a2a;
-    border: 1px solid #444;
-    color: #eee;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: bold;
-    transition: all 0.2s;
-    min-width: 32px;
-}
-
-.vote-btn:hover {
-    background: #00bba3;
-    color: #000;
-    border-color: #00bba3;
-    transform: translateY(-2px);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-}
-
-.vote-btn:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-    background: #555;
-}
-/* --- CS ve GOLD STİLLERİ --- */
-
-/* Kartın iç yapısını düzenleyelim */
-.card-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-
+/* --- İSTATİSTİKLER (KDA, CS, GOLD) --- */
 .stats-group {
     text-align: right;
     min-width: 90px;
@@ -253,19 +184,31 @@ h1 {
     justify-content: center;
 }
 
+.result-text {
+    font-weight: bold;
+    font-size: 1rem;
+    line-height: 1.2;
+}
+
+.kda-text {
+    color: #aaa;
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+}
+
 .farm-text {
-    font-size: 0.8rem;
-    margin-top: 4px;
-    color: #ccc;
+    font-size: 0.75rem;
+    color: #888;
     display: flex;
-    flex-direction: column; /* Alt alta yazsın */
+    flex-direction: column; /* CS ve Gold alt alta */
+    gap: 1px;
 }
 
 .cs-val {
-    color: #a0a0a0;
+    color: #bbb;
 }
 
 .gold-val {
+    color: #ffd700;
     font-weight: bold;
-    color: #ffd700; /* Altın sarısı */
 }
