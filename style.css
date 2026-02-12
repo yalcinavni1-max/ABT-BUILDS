@@ -242,3 +242,42 @@ h1 {
     from { opacity: 0; transform: translateY(-10px); }
     to { opacity: 1; transform: translateY(0); }
 }
+/* --- OYLAMA STİLLERİ --- */
+
+/* Puan Göstergesi (Yıldızlı Kısım) */
+.user-score-display {
+    font-size: 0.85rem;
+    font-weight: bold;
+    margin-top: 4px;
+}
+
+/* Oylama Butonları Kutusu */
+.vote-buttons-container {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* Tekil Puan Butonu */
+.vote-btn {
+    background: #333;
+    border: 1px solid #555;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.vote-btn:hover {
+    background: #00bba3;
+    border-color: #00bba3;
+    transform: scale(1.1);
+}
+
+/* Kartın içine biraz boşluk ekle */
+.match-details {
+    text-align: center;
+}
