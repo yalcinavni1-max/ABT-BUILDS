@@ -2,7 +2,7 @@ import re
 import time
 import random
 from flask import Flask, jsonify, send_from_directory
-import requests
+import cloudscraper # SİHİRLİ KÜTÜPHANE
 from bs4 import BeautifulSoup
 from flask_cors import CORS
 
@@ -18,30 +18,40 @@ URL_LISTESI = [
 def serve_index():
     return send_from_directory('.', 'index.html')
 
+# CloudScraper nesnesi oluştur (Bot korumasını aşan araç)
+scraper = cloudscraper.create_scraper(
+    browser={
+        'browser': 'chrome',
+        'platform': 'windows',
+        'desktop': True
+    }
+)
+
 def get_latest_version():
     try:
+        # Versiyon kontrolü için basit requests yeterli
+        import requests
         r = requests.get("https://ddragon.leagueoflegends.com/api/versions.json")
         if r.status_code == 200: return r.json()[0]
     except: pass
     return "14.3.1"
 
-session = requests.Session()
-
 def scrape_summoner(url):
-    # Siteyi kızdırmamak için bekleme
-    time.sleep(random.uniform(1.0, 2.5))
+    # Siteyi yormamak için kısa bekleme
+    time.sleep(random.uniform(1.0, 3.0))
     
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.google.com/"
-    }
-    
     try:
-        response = session.get(url, headers=headers, timeout=25)
+        # BURASI DEĞİŞTİ: requests yerine scraper kullanıyoruz
+        response = scraper.get(url)
+        
+        # Eğer koruma sayfası geldiyse bile scraper bunu genelde çözer.
+        if response.status_code != 200:
+            print(f"Hata Kodu: {response.status_code}")
+            return {"error": "Site Erişimi Engellendi", "summoner": "Veri Yok", "matches": []}
+
         soup = BeautifulSoup(response.content, 'html.parser')
 
         # --- PROFİL ---
@@ -72,6 +82,7 @@ def scrape_summoner(url):
         
         for row in all_rows:
             try:
+                # KDA olmayan satırı atla
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
@@ -105,44 +116,45 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (METİN OKUMA MODU - KESİN ÇÖZÜM)
+                # 2. İTEMLER (HEM RESİM HEM CLASS TARAMA)
                 items = []
                 
-                # İtemlerin olduğu kutuyu bul
+                # Sadece itemlerin bulunduğu alanı al
                 items_container = row.find("div", class_="items")
+                search_area = items_container if items_container else row
                 
-                if items_container:
-                    # Kutunun içindeki HTML kodunu tamamen DÜZ YAZIYA çevir
-                    # Böylece <img> etiketi mi, <div> mi, background mu diye düşünmeyiz.
-                    container_html = str(items_container)
+                # HTML kodunu metne çevir
+                html_text = str(search_area)
+
+                # YÖNTEM A: Resim yollarındaki sayıları bul (items/6672.png)
+                matches_img = re.findall(r"items\/[\w\/]*(\d{4})", html_text)
+                
+                # YÖNTEM B: Class isimlerindeki sayıları bul (requireTooltip-item-6672)
+                # League of Graphs bazen item ID'sini class içine gizler.
+                matches_class = re.findall(r"item[-_]?(\d{4})", html_text)
+
+                # YÖNTEM C: Düz 4 haneli sayıları bul (img src=".../3078.png")
+                matches_raw = re.findall(r"[\"\/](\d{4})\.(png|jpg|webp)", html_text)
+                
+                # Raw match sonucunda tuple döner (id, uzantı), sadece id'yi alalım
+                raw_ids = [m[0] for m in matches_raw]
+
+                # Hepsini birleştir
+                all_candidates = matches_img + matches_class + raw_ids
+                
+                for num in all_candidates:
+                    val = int(num)
                     
-                    # Regex: Yazının içindeki tüm 4 haneli sayıları bul
-                    candidates = re.findall(r"(\d{4})", container_html)
-                    
-                    for num in candidates:
-                        val = int(num)
+                    # FİLTRELER
+                    if 1000 <= val <= 8000:
+                        # Yasaklı ID'ler (Yıllar, Rünler, Ekran Boyutları)
+                        if 2020 <= val <= 2030: continue
+                        if 5000 <= val < 6000: continue
+                        if val in [1080, 1200, 1280, 1440, 1920, 2560]: continue
                         
-                        # FİLTRELER (Gereksiz Sayıları Temizle)
-                        if 1000 <= val <= 8000:
-                            # 2024, 2025 gibi yılları at
-                            if 2020 <= val <= 2030: continue
-                            # 5000-5999 arası genelde rünlerdir, at
-                            if 5000 <= val < 6000: continue
-                            # HTML genişlik/yükseklik kodlarını at (64, 48 vs zaten 1000 altı ama garanti olsun)
-                            if val in [1080, 1200, 1280, 1440, 1920]: continue
-                            
-                            # Geriye kalan sayı kesinlikle İTEMDİR.
-                            items.append(f"{RIOT_CDN}/item/{val}.png")
+                        items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                # Eğer yukarıdaki yöntem bulamazsa (çok nadir), tüm satıra bak (Yedek)
-                if not items:
-                    matches = re.findall(r"items\/[\w\/]*(\d{4})", str(row))
-                    for num in matches:
-                        val = int(num)
-                        if 1000 <= val <= 8000 and not (5000 <= val < 6000):
-                             items.append(f"{RIOT_CDN}/item/{val}.png")
-
-                # Tekrarları Temizle
+                # Tekrarları temizle
                 clean_items = []
                 seen = set()
                 for x in items:
