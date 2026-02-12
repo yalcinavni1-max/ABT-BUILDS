@@ -227,56 +227,13 @@ h1 {
 /* --- YENİ EKLENEN PUANLAMA STİLLERİ --- */
 
 .match-card {
-    cursor: pointer; /* Tıklanabilir olduğunu gösterir */
-    flex-direction: column; /* Detayları alta açmak için */
-    align-items: stretch;
-}
-
-.match-details {
-    display: none; /* Başlangıçta gizli */
-    padding: 10px;
-    background: rgba(0, 0, 0, 0.2);
-    border-top: 1px solid rgba(255,255,255,0.05);
-    text-align: center;
-    margin-top: 5px;
-}
-
-/* Tıklayınca açılması için */
-.match-card.active .match-details {
-    display: block;
-}
-
-.vote-buttons-container {
-    display: flex;
-    gap: 3px;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.vote-btn {
-    background: #333;
-    border: 1px solid #555;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 3px;
     cursor: pointer;
-    font-size: 0.8rem;
-}
-
-.vote-btn:hover {
-    background: #00bba3;
-    border-color: #00bba3;
-}
-/* --- YENİ EKLENEN PUANLAMA STİLLERİ --- */
-
-.match-card {
-    cursor: pointer; /* Tıklanabilir olduğunu gösterir */
-    flex-direction: column; /* Detayları alta açmak için */
+    flex-direction: column;
     align-items: stretch;
 }
 
 .match-details {
-    display: none; /* Başlangıçta gizli */
+    display: none; /* Gizli */
     padding: 10px;
     background: rgba(0, 0, 0, 0.2);
     border-top: 1px solid rgba(255,255,255,0.05);
