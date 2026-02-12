@@ -20,18 +20,21 @@ async function fetchMatches() {
     }
 }
 
-// YENİ: Oy Gönderme Fonksiyonu
+// --- EKSİK OLAN FONKSİYON EKLENDİ ---
 async function sendVote(matchId, points, elementId) {
     try {
+        console.log("Oy gönderiliyor:", matchId, points); // Kontrol için
         const response = await fetch('/api/vote', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ match_id: matchId, points: points })
         });
         
+        if (!response.ok) throw new Error("Kayıt başarısız");
+
         const result = await response.json();
         
-        // Puanı güncelle
+        // Puanı ekranda güncelle
         const scoreElement = document.getElementById(elementId);
         if (scoreElement) {
             scoreElement.innerHTML = `<span style="color:#ffd700;">★ ${result.average}</span> <span style="font-size:0.7rem; color:#888;">(${result.count} oy)</span>`;
@@ -40,7 +43,8 @@ async function sendVote(matchId, points, elementId) {
         alert("Puanın kaydedildi: " + points);
         
     } catch (error) {
-        alert("Oy verilirken hata oluştu.");
+        console.error("Oylama hatası:", error);
+        alert("Oy verilirken hata oluştu. Lütfen sayfayı yenile.");
     }
 }
 
@@ -71,16 +75,15 @@ function createProfileCard(user) {
             const card = document.createElement('div');
             card.classList.add('match-card', match.result);
 
-            // YENİ: Karta tıklayınca açılması için
+            // Karta tıklayınca açılması için
             card.onclick = function(e) {
-                // Eğer butona tıklandıysa kartı açma/kapama
                 if(e.target.tagName === 'BUTTON') return;
                 this.classList.toggle('active');
             };
 
             let itemsHtml = '';
             
-            // 1. İtemleri Ekle
+            // İtemleri Ekle
             if (match.items) {
                 match.items.forEach(itemUrl => {
                     itemsHtml += `
@@ -91,7 +94,7 @@ function createProfileCard(user) {
                 });
             }
 
-            // 2. Boşlukları Doldur (9 SLOTLU SENİN AYARIN)
+            // Boşlukları Doldur (9 Slot)
             const currentCount = match.items ? match.items.length : 0;
             for (let i = currentCount; i < 9; i++) {
                 itemsHtml += `<div class="item-slot empty"></div>`;
@@ -103,6 +106,7 @@ function createProfileCard(user) {
             // Butonları oluştur
             let buttonsHtml = '';
             for(let i=1; i<=10; i++) {
+                // Tırnak işaretlerine dikkat ederek HTML oluşturuyoruz
                 buttonsHtml += `<button class="vote-btn" onclick="sendVote('${match.match_id}', ${i}, '${scoreDisplayId}')">${i}</button>`;
             }
 
