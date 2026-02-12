@@ -16,11 +16,11 @@ async function fetchMatches() {
 
     } catch (error) {
         console.error("Hata:", error);
-        profilesArea.innerHTML = `<div style="text-align:center; padding:50px; color:#aaa;">Veriler yükleniyor...</div>`;
+        profilesArea.innerHTML = `<div style="text-align:center; padding:50px; color:#aaa;">Veriler yükleniyor...<br>Lütfen bekleyin.</div>`;
     }
 }
 
-// Oy Gönderme Fonksiyonu
+// Oy Gönderme Fonksiyonu (Aynen koruyoruz)
 async function sendVote(matchId, points, elementId) {
     try {
         const response = await fetch('/api/vote', {
@@ -28,19 +28,15 @@ async function sendVote(matchId, points, elementId) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ match_id: matchId, points: points })
         });
-        
         const result = await response.json();
         
-        // Ekrana yeni puanı yaz
         const scoreElement = document.getElementById(elementId);
         if (scoreElement) {
             scoreElement.innerHTML = `<span style="color:#ffd700;">★ ${result.average}</span> <span style="font-size:0.7rem; color:#888;">(${result.count} oy)</span>`;
         }
-        
         alert("Puanın kaydedildi!");
-        
     } catch (error) {
-        alert("Oy verilirken hata oluştu.");
+        alert("Hata oluştu.");
     }
 }
 
@@ -48,13 +44,14 @@ function createProfileCard(user) {
     const profileSection = document.createElement('div');
     profileSection.classList.add('user-section');
 
+    // Profil resmi ve bilgiler
     const icon = user.icon || "https://ddragon.leagueoflegends.com/cdn/14.3.1/img/profileicon/29.png";
     const name = user.summoner || "Sihirdar";
     const rank = user.rank || "Unranked";
 
     const headerHtml = `
         <div class="profile-header">
-            <img src="${icon}" class="profile-icon" alt="Icon">
+            <img src="${icon}" class="profile-icon" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/profileicon/29.png'">
             <div class="profile-text">
                 <div class="summoner-name-style">${name}</div>
                 <div class="rank-text">${rank}</div>
@@ -71,28 +68,36 @@ function createProfileCard(user) {
             const card = document.createElement('div');
             card.classList.add('match-card', match.result);
 
-            // Detay açma/kapama
             card.onclick = function(e) {
-                // Eğer butonlara tıklanırsa kartı açma
                 if(e.target.tagName === 'BUTTON') return;
                 this.classList.toggle('active');
             };
 
+            // --- İTEMLERİ DÜZENLEME (RESİM DÜZELTME KISMI) ---
             let itemsHtml = '';
-            if (match.items) {
-                match.items.forEach(itemUrl => {
-                    itemsHtml += `<div class="item-slot"><img src="${itemUrl}" class="item-img"></div>`;
-                });
-            }
-            const currentCount = match.items ? match.items.length : 0;
-            for (let i = currentCount; i < 9; i++) {
-                itemsHtml += `<div class="item-slot empty"></div>`;
+            
+            // Backend'den bazen 7'den fazla veya hatalı veri gelebilir.
+            // Biz burada MAX 7 tane kutu oluşturacağız.
+            const maxSlots = 7; 
+            const itemsList = match.items || [];
+
+            for (let i = 0; i < maxSlots; i++) {
+                if (i < itemsList.length) {
+                    // Resim varsa koy
+                    // ÖNEMLİ: onerror="this.style.display='none'"
+                    // Eğer resim yüklenemezse (404), resmi gizle -> Sadece gri kutu kalsın.
+                    itemsHtml += `
+                        <div class="item-slot">
+                            <img src="${itemsList[i]}" class="item-img" onerror="this.style.display='none'">
+                        </div>`;
+                } else {
+                    // Resim yoksa boş kutu koy
+                    itemsHtml += `<div class="item-slot empty"></div>`;
+                }
             }
 
-            // Benzersiz ID oluştur (Puanı güncellemek için)
-            const scoreDisplayId = `score-${name}-${index}`.replace(/\s/g, '');
-
-            // Puan Butonlarını Oluştur (1-10 arası)
+            // Puanlama ID'si
+            const scoreDisplayId = `score-${name.replace(/\s/g, '')}-${index}`;
             let buttonsHtml = '';
             for(let i=1; i<=10; i++) {
                 buttonsHtml += `<button class="vote-btn" onclick="sendVote('${match.match_id}', ${i}, '${scoreDisplayId}')">${i}</button>`;
@@ -101,7 +106,7 @@ function createProfileCard(user) {
             card.innerHTML = `
                 <div class="match-summary">
                     <div class="champ-info">
-                        <img src="${match.img}" class="champ-img">
+                        <img src="${match.img}" class="champ-img" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/champion/Poro.png'">
                         <div>
                             <span class="champ-name">${match.champion}</span>
                             <div id="${scoreDisplayId}" class="user-score-display">
