@@ -17,7 +17,7 @@ URL_LISTESI = [
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-# --- GELİŞMİŞ NOT HESAPLAMA MOTORU ---
+# --- NOT HESAPLAMA MOTORU (S, A, B...) ---
 def calculate_grade(kda_text):
     try:
         # 1. "Perfect" (Hiç ölmemiş) kontrolü
@@ -25,7 +25,6 @@ def calculate_grade(kda_text):
             return "S"
             
         # 2. Metnin içindeki sayıları bul (Örn: "3 / 9 / 15" -> [3, 9, 15])
-        # Regex ile string içindeki tüm sayıları liste olarak alıyoruz
         numbers = re.findall(r"(\d+)", kda_text)
         
         kda_score = 0.0
@@ -36,22 +35,21 @@ def calculate_grade(kda_text):
             deaths = float(numbers[1])
             assists = float(numbers[2])
             
-            # KDA Formülü: (Kill + Asist) / Ölüm
+            # Formül: (Kill + Asist) / Ölüm
             if deaths == 0:
-                kda_score = 99.0 # Ölüm 0 ise skor sonsuzdur, direkt S alır
+                kda_score = 99.0 # Ölüm 0 ise skor sonsuzdur
             else:
                 kda_score = (kills + assists) / deaths
                 
         else:
-            # Eğer 3 sayı bulamazsa (belki site "3.50:1" formatında vermiştir)
-            # Eski yöntemi yedek olarak kullanalım
+            # Yedek yöntem: Hazır oran varsa onu çek
             match = re.search(r"(\d+\.?\d*)", kda_text)
             if match:
                 kda_score = float(match.group(1))
             else:
                 return "-"
 
-        # 3. Hesaplanan skora göre not ver
+        # 3. Nota Dönüştür
         if kda_score >= 4.0: return "S"       # 4 ve üzeri
         elif 3.0 <= kda_score < 4.0: return "A" # 3-4 arası
         elif 2.5 <= kda_score < 3.0: return "B" # 2.5-3 arası
@@ -69,7 +67,7 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
-# --- KULLANICI ÇEKEN FONKSİYON ---
+# --- SCRAPER ---
 def scrape_summoner(url):
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
@@ -83,7 +81,7 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # 1. İSİM VE RANK
+        # 1. Profil Bilgileri
         summoner_name = "Bilinmeyen Sihirdar"
         try:
             title = soup.find("title").text
@@ -99,14 +97,13 @@ def scrape_summoner(url):
                 if tier: rank_text = tier.text.strip()
         except: pass
 
-        # Profil Resmi
         profile_icon = f"{RIOT_CDN}/profileicon/29.png"
         try:
             img = soup.find("div", class_="img").find("img")
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # 2. MAÇLAR
+        # 2. Maç Verileri
         matches_info = []
         all_rows = soup.find_all("tr")
         
@@ -115,7 +112,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # ŞAMPİYON
+                # Şampiyon
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -145,7 +142,7 @@ def scrape_summoner(url):
                 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # İTEMLER
+                # İtemler
                 items = []
                 img_tags = row.find_all("img")
                 for img in img_tags:
@@ -167,27 +164,28 @@ def scrape_summoner(url):
                         seen.add(x)
                 clean_items = clean_items[:9]
 
+                # --- VERİ ÇEKME ALANI ---
+                row_text = row.text.strip()
                 kda_text = kda_div.text.strip()
+                
                 result = "lose"
                 if "Victory" in row.text or "Zafer" in row.text: result = "win"
                 
-                # --- YENİ EKLENEN KISIMLAR ---
-                
-                # 1. NOT HESAPLAMA (DÜZELTİLDİ: (K+A)/D formülü)
+                # 1. NOT HESAPLAMA (S, A, B...)
                 grade = calculate_grade(kda_text)
 
-                # 2. CS ve ALTIN ÇEKME
-                row_text = row.text.strip()
-                
+                # 2. CS ÇEKME (Minyon)
                 cs_stat = "0 CS"
                 cs_match = re.search(r"(\d+)\s*CS", row_text)
                 if cs_match:
                     cs_stat = f"{cs_match.group(1)} CS"
 
-                gold_stat = "0k"
-                gold_match = re.search(r"(\d+\.?\d*)\s*k", row_text)
-                if gold_match:
-                    gold_stat = f"{gold_match.group(1)}k"
+                # 3. LEVEL ÇEKME (Altın yerine Level kullanıyoruz çünkü Altın verisi yok)
+                # Frontend'i bozmamak için 'gold' değişkenine Level'ı atıyoruz.
+                gold_stat = "Lvl -"
+                lvl_match = re.search(r"Lvl\.?\s*(\d+)", row_text)
+                if lvl_match:
+                    gold_stat = f"Lvl {lvl_match.group(1)}"
 
                 matches_info.append({
                     "champion": champ_key,
@@ -197,7 +195,7 @@ def scrape_summoner(url):
                     "items": clean_items,
                     "grade": grade,
                     "cs": cs_stat,
-                    "gold": gold_stat
+                    "gold": gold_stat  # Artık burada doğru çalışan Level verisi var
                 })
                 if len(matches_info) >= 5: break
             except: continue
