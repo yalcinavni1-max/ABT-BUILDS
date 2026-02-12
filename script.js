@@ -38,13 +38,17 @@ function createProfileCard(user) {
         user.matches.forEach((match) => {
             const card = document.createElement('div');
             card.classList.add('match-card', match.result);
+            
+            // Tıklama olayı: Detayı aç/kapat
+            card.onclick = function() {
+                this.classList.toggle('active');
+            };
 
             let itemsHtml = '';
             if (match.items) match.items.forEach(url => itemsHtml += `<div class="item-slot"><img src="${url}" class="item-img" onerror="this.parentElement.style.display='none'"></div>`);
             const currentCount = match.items ? match.items.length : 0;
             for (let i = currentCount; i < 9; i++) itemsHtml += `<div class="item-slot empty"></div>`;
 
-            // Nota göre renk sınıfı belirle
             const gradeClass = `grade-${match.grade}`; 
 
             card.innerHTML = `
@@ -62,10 +66,22 @@ function createProfileCard(user) {
                     <div class="stats-group">
                         <div class="result-text">${match.result.toUpperCase()}</div>
                         <div class="kda-text">${match.kda}</div>
-                        <div class="farm-text">
-                            <span class="cs-val">${match.cs}</span> 
-                            <span class="gold-val">💰${match.gold}</span>
-                        </div>
+                        <div style="font-size:0.7rem; color:#666; margin-top:4px;">▼ Detay</div>
+                    </div>
+                </div>
+
+                <div class="match-details">
+                    <div class="detail-box">
+                        <span class="detail-label">Seviye</span>
+                        <span class="detail-val text-white">${match.level}</span>
+                    </div>
+                    <div class="detail-box">
+                        <span class="detail-label">Minyon</span>
+                        <span class="detail-val text-gray">${match.cs}</span>
+                    </div>
+                    <div class="detail-box">
+                        <span class="detail-label">Altın</span>
+                        <span class="detail-val text-gold">💰${match.gold}</span>
                     </div>
                 </div>
             `;
