@@ -235,3 +235,37 @@ h1 {
     opacity: 0.6;
     background: #555;
 }
+/* --- CS ve GOLD STİLLERİ --- */
+
+/* Kartın iç yapısını düzenleyelim */
+.card-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.stats-group {
+    text-align: right;
+    min-width: 90px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.farm-text {
+    font-size: 0.8rem;
+    margin-top: 4px;
+    color: #ccc;
+    display: flex;
+    flex-direction: column; /* Alt alta yazsın */
+}
+
+.cs-val {
+    color: #a0a0a0;
+}
+
+.gold-val {
+    font-weight: bold;
+    color: #ffd700; /* Altın sarısı */
+}
