@@ -41,7 +41,9 @@ def scrape_summoner(url):
         # 1. İSİM VE RANK
         summoner_name = "Bilinmeyen Sihirdar"
         try:
+            # Sayfa başlığından ismi çek (Daha garanti)
             title = soup.find("title").text
+            # Örn: "Ragnar Lothbrok - League of Legends..." -> Sadece ismi al
             summoner_name = title.split("(")[0].strip().replace(" - League of Legends", "")
         except: pass
 
