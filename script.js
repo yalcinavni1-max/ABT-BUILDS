@@ -20,18 +20,19 @@ async function fetchMatches() {
     }
 }
 
-// --- EKSİK OLAN FONKSİYON EKLENDİ ---
+// BU FONKSİYON EKSİKTİ, ARTIK VAR:
 async function sendVote(matchId, points, elementId) {
     try {
-        console.log("Oy gönderiliyor:", matchId, points); // Kontrol için
+        console.log("Oy gönderiliyor: " + points + " puan -> " + matchId);
+        
         const response = await fetch('/api/vote', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ match_id: matchId, points: points })
         });
         
-        if (!response.ok) throw new Error("Kayıt başarısız");
-
+        if (!response.ok) throw new Error("Sunucu hatası");
+        
         const result = await response.json();
         
         // Puanı ekranda güncelle
@@ -40,11 +41,11 @@ async function sendVote(matchId, points, elementId) {
             scoreElement.innerHTML = `<span style="color:#ffd700;">★ ${result.average}</span> <span style="font-size:0.7rem; color:#888;">(${result.count} oy)</span>`;
         }
         
-        alert("Puanın kaydedildi: " + points);
+        alert(points + " puan verildi! Teşekkürler.");
         
     } catch (error) {
-        console.error("Oylama hatası:", error);
-        alert("Oy verilirken hata oluştu. Lütfen sayfayı yenile.");
+        console.error(error);
+        alert("Oy verilirken bir hata oluştu.");
     }
 }
 
@@ -77,6 +78,7 @@ function createProfileCard(user) {
 
             // Karta tıklayınca açılması için
             card.onclick = function(e) {
+                // Eğer butona tıklandıysa kartı açma/kapama
                 if(e.target.tagName === 'BUTTON') return;
                 this.classList.toggle('active');
             };
@@ -100,13 +102,13 @@ function createProfileCard(user) {
                 itemsHtml += `<div class="item-slot empty"></div>`;
             }
 
-            // Puanlama ID'si
-            const scoreDisplayId = `score-${name.replace(/\s/g, '')}-${index}`;
+            // Puanlama ID'si (Türkçe karakterleri temizle)
+            const safeName = name.replace(/\s/g, '').replace(/[^a-zA-Z0-9]/g, '');
+            const scoreDisplayId = `score-${safeName}-${index}`;
             
             // Butonları oluştur
             let buttonsHtml = '';
             for(let i=1; i<=10; i++) {
-                // Tırnak işaretlerine dikkat ederek HTML oluşturuyoruz
                 buttonsHtml += `<button class="vote-btn" onclick="sendVote('${match.match_id}', ${i}, '${scoreDisplayId}')">${i}</button>`;
             }
 
