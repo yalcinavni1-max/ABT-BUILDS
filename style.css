@@ -1,23 +1,15 @@
-/* --- TEMEL SAYFA AYARLARI --- */
 body {
-    /* Arka plan resmi ragnar.jpg dosyanızla aynı isimde olmalı */
     background: #0a0a0c url('ragnar.jpg') no-repeat center center fixed;
     background-size: cover;
-    
     min-height: 100vh;
     color: white;
     font-family: 'Roboto', sans-serif;
-    margin: 0;
-    padding: 0;
+    margin: 0; padding: 0;
 }
 
-/* Arka planı karartma katmanı */
 .overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.85);
     z-index: 1;
 }
@@ -30,57 +22,16 @@ body {
     z-index: 2;
 }
 
-header {
-    text-align: center;
-    margin-bottom: 40px;
-}
+header { text-align: center; margin-bottom: 40px; }
+h1 { font-size: 2.5rem; margin: 0; color: #f0e6d2; text-shadow: 0 0 10px rgba(240, 230, 210, 0.5); }
 
-h1 {
-    font-size: 2.5rem;
-    margin: 0;
-    color: #f0e6d2;
-    text-shadow: 0 0 10px rgba(240, 230, 210, 0.5);
-}
+.user-section { margin-bottom: 60px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.profile-header { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; padding-left: 10px; }
+.profile-icon { width: 60px; height: 60px; border-radius: 50%; border: 2px solid #00bba3; }
+.summoner-name-style { font-size: 1.8rem; font-weight: bold; color: #00bba3; }
+.rank-text { color: #ccc; font-size: 0.9rem; }
 
-/* --- PROFİL KARTI --- */
-.user-section {
-    margin-bottom: 60px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-.profile-header {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 20px;
-    padding-left: 10px;
-}
-
-.profile-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    border: 2px solid #00bba3;
-}
-
-.profile-text {
-    display: flex;
-    flex-direction: column;
-}
-
-.summoner-name-style {
-    font-size: 1.8rem;
-    font-weight: bold;
-    color: #00bba3;
-}
-
-.rank-text {
-    color: #ccc;
-    font-size: 0.9rem;
-}
-
-/* --- MAÇ KARTI --- */
+/* MAÇ KARTI */
 .match-card {
     background: #1e1e1e;
     border-radius: 6px;
@@ -88,27 +39,15 @@ h1 {
     margin-bottom: 8px;
     border-left: 5px solid gray;
     display: flex;
-    flex-direction: column; /* Detayların aşağı açılması için dikey yapı */
+    flex-direction: column; /* Dikey yerleşim */
+    transition: transform 0.2s, background 0.2s;
     cursor: pointer;
-    transition: background 0.2s, transform 0.2s;
 }
 
-.match-card:hover {
-    background: #252525;
-    transform: translateX(3px);
-}
+.match-card:hover { transform: translateX(5px); background: #252525; }
+.match-card.win { background: linear-gradient(90deg, rgba(30, 40, 60, 0.95) 0%, rgba(15, 20, 30, 0.95) 100%); border-left-color: #2deb90; }
+.match-card.lose { background: linear-gradient(90deg, rgba(60, 30, 30, 0.95) 0%, rgba(30, 15, 15, 0.95) 100%); border-left-color: #ff5859; }
 
-.match-card.win {
-    background: linear-gradient(90deg, rgba(30, 40, 60, 0.95) 0%, rgba(15, 20, 30, 0.95) 100%);
-    border-left-color: #2deb90;
-}
-
-.match-card.lose {
-    background: linear-gradient(90deg, rgba(60, 30, 30, 0.95) 0%, rgba(30, 15, 15, 0.95) 100%);
-    border-left-color: #ff5859;
-}
-
-/* Kartın Ana İçeriği (Yatay) */
 .card-content {
     display: flex;
     justify-content: space-between;
@@ -116,97 +55,36 @@ h1 {
     width: 100%;
 }
 
-/* --- ŞAMPİYON VE NOT BÖLÜMÜ --- */
-.champ-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 140px;
-}
+.champ-info { display: flex; align-items: center; gap: 10px; width: 140px; }
+.champ-img { width: 40px; height: 40px; border-radius: 50%; }
+.champ-name { display: block; font-weight: bold; font-size: 0.95rem; margin-bottom: 3px; }
 
-.champ-img {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-}
-
-.champ-name {
-    display: block;
-    font-weight: bold;
-    font-size: 0.9rem;
-    margin-bottom: 3px;
-}
-
-/* NOT ROZETLERİ (S, A, B...) */
+/* NOT ROZETLERİ */
 .grade-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-weight: bold;
-    font-size: 0.85rem;
-    text-align: center;
-    min-width: 24px;
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-weight: bold; font-size: 0.85rem; text-align: center; min-width: 24px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
 }
+.grade-S { background: linear-gradient(135deg, #FFD700, #FFA500); color: black; border: 1px solid #fff; }
+.grade-A { background: #2deb90; color: black; }
+.grade-B { background: #3498db; color: white; }
+.grade-C { background: #9b59b6; color: white; }
+.grade-D { background: #7f8c8d; color: white; }
+.grade-F { background: #c0392b; color: white; }
+.grade-- { background: #333; color: #777; }
 
-/* Not Renkleri */
-.grade-S { background: linear-gradient(135deg, #FFD700, #FFA500); color: black; border: 1px solid #fff; } /* Altın */
-.grade-A { background: #2deb90; color: black; } /* Yeşil */
-.grade-B { background: #3498db; color: white; } /* Mavi */
-.grade-C { background: #9b59b6; color: white; } /* Mor */
-.grade-D { background: #7f8c8d; color: white; } /* Gri */
-.grade-F { background: #c0392b; color: white; } /* Kırmızı */
-.grade-- { background: #333; color: #777; }     /* Belirsiz */
+/* İtemler */
+.items-grid { display: flex; gap: 2px; width: 320px; min-width: 320px; }
+.item-slot { width: 35px; height: 35px; border: 1px solid #444; background: #111; border-radius: 4px; flex-shrink: 0; overflow: hidden; }
+.item-img { width: 100%; height: 100%; object-fit: cover; }
 
-/* --- İTEMLER --- */
-.items-grid {
-    display: flex;
-    gap: 2px;
-    width: 320px;
-    min-width: 320px;
-}
-
-.item-slot {
-    width: 35px;
-    height: 35px;
-    border: 1px solid #444;
-    background: #111;
-    border-radius: 4px;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-.item-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-/* --- İSTATİSTİKLER (SAĞ TARAF) --- */
-.stats-group {
-    text-align: right;
-    min-width: 80px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
-.result-text {
-    font-weight: bold;
-    font-size: 1rem;
-    line-height: 1.2;
-}
-
-.kda-text {
-    color: #aaa;
-    font-size: 0.9rem;
-    margin-bottom: 2px;
-}
+.stats { text-align: right; width: 80px; }
+.result-text { font-weight: bold; font-size: 1rem; margin-bottom: 2px; }
+.kda-text { color: #aaa; font-size: 0.9rem; }
 
 /* --- GİZLİ DETAY PANELİ --- */
 .match-details {
-    display: none; /* Başlangıçta gizli */
+    display: none; /* Gizli */
     margin-top: 15px;
     padding-top: 15px;
     border-top: 1px solid rgba(255,255,255,0.1);
@@ -215,35 +93,17 @@ h1 {
     animation: fadeIn 0.3s ease;
 }
 
-/* Karta tıklandığında görünür yap */
+/* Aktif olunca görünür yap */
 .match-card.active .match-details {
-    display: flex; /* Flex olarak aç */
+    display: flex;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-5px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
-.detail-box {
-    text-align: center;
-}
+.detail-box { text-align: center; }
+.detail-label { display: block; font-size: 0.7rem; color: #777; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }
+.detail-val { font-size: 1.1rem; font-weight: bold; }
 
-.detail-label {
-    display: block;
-    font-size: 0.75rem;
-    color: #777;
-    margin-bottom: 2px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.detail-val {
-    font-size: 1.1rem;
-    font-weight: bold;
-}
-
-/* Detay Renkleri */
 .text-white { color: #eee; }
 .text-gray { color: #aaa; }
 .text-gold { color: #ffd700; }
