@@ -3,7 +3,7 @@ import time
 import random
 import json
 import os
-from flask import Flask, jsonify, send_from_directory, request
+from flask import Flask, jsonify, send_from_directory, request # 'request' eklendi
 import requests
 from bs4 import BeautifulSoup
 from flask_cors import CORS
@@ -143,7 +143,7 @@ def scrape_summoner(url):
                 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # İTEMLER (SENİN MANTIĞIN - DOKUNMADIK)
+                # İTEMLER (SENİN KODUN - 9 SLOTLU)
                 items = []
                 img_tags = row.find_all("img")
                 for img in img_tags:
@@ -163,13 +163,13 @@ def scrape_summoner(url):
                     if x not in seen:
                         clean_items.append(x)
                         seen.add(x)
-                clean_items = clean_items[:9] # Senin ayarın: 9 İtem
+                clean_items = clean_items[:9] # Senin ayarın
 
                 kda_text = kda_div.text.strip()
                 result = "lose"
                 if "Victory" in row.text or "Zafer" in row.text: result = "win"
                 
-                # --- 3. PUAN VERİSİNİ EKLEME (YENİ) ---
+                # --- 3. PUANLARI HESAPLA (YENİ) ---
                 match_id = f"{summoner_name}-{champ_key}-{kda_text}".replace(" ", "")
                 current_score = "-"
                 vote_count = 0
@@ -182,14 +182,14 @@ def scrape_summoner(url):
                         vote_count = count
 
                 matches_info.append({
-                    "match_id": match_id,  # Frontend için ID
+                    "match_id": match_id, # Kimlik
                     "champion": champ_key,
                     "result": result,
                     "kda": kda_text,
                     "img": final_champ_img,
                     "items": clean_items,
                     "user_score": current_score, # Puan
-                    "vote_count": vote_count     # Oy sayısı
+                    "vote_count": vote_count     # Oy Sayısı
                 })
                 if len(matches_info) >= 5: break
             except: continue
@@ -211,7 +211,6 @@ def get_all_users():
     for url in URL_LISTESI:
         data = scrape_summoner(url)
         all_data.append(data)
-    
     return jsonify(all_data)
 
 if __name__ == '__main__':
