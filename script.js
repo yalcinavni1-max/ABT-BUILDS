@@ -20,9 +20,10 @@ async function fetchMatches() {
     }
 }
 
-// BU FONKSİYON EKSİKTİ, ARTIK VAR:
+// --- EKSİK OLAN FONKSİYON EKLENDİ ---
 async function sendVote(matchId, points, elementId) {
     try {
+        // Tıklanan butona görsel tepki verelim
         console.log("Oy gönderiliyor: " + points + " puan -> " + matchId);
         
         const response = await fetch('/api/vote', {
