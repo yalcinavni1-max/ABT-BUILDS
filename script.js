@@ -16,7 +16,7 @@ async function fetchMatches() {
 
     } catch (error) {
         console.error("Hata:", error);
-        profilesArea.innerHTML = `<div style="text-align:center; padding:50px; color:#aaa;">Veriler yükleniyor...</div>`;
+        profilesArea.innerHTML = `<div style="text-align:center; padding:50px; color:#aaa;">Veriler yükleniyor...<br>Lütfen bekleyin.</div>`;
     }
 }
 
@@ -47,55 +47,42 @@ function createProfileCard(user) {
             const card = document.createElement('div');
             card.classList.add('match-card', match.result);
 
-            // Tıklayınca Detay Açma Olayı
-            card.onclick = function() {
-                this.classList.toggle('active');
-            };
-
             let itemsHtml = '';
+            
+            // 1. İtemleri Ekle
             if (match.items) {
                 match.items.forEach(itemUrl => {
-                    itemsHtml += `<div class="item-slot"><img src="${itemUrl}" class="item-img" onerror="this.parentElement.style.display='none'"></div>`;
+                    itemsHtml += `
+                        <div class="item-slot">
+                            <img src="${itemUrl}" class="item-img" alt="Item" onerror="this.parentElement.style.display='none'">
+                        </div>
+                    `;
                 });
             }
+
+            // 2. Boşlukları Doldur (DÖNGÜ: 7 OLMALI)
             const currentCount = match.items ? match.items.length : 0;
+            // Buradaki 7 sayısı slot sayısını belirler. 
             for (let i = currentCount; i < 9; i++) {
                 itemsHtml += `<div class="item-slot empty"></div>`;
             }
 
-            // Puan Rengi Belirleme
-            let scoreClass = "score-gray";
-            if (match.score === "MVP" || match.score === "S") scoreClass = "score-gold";
-            else if (match.score === "A") scoreClass = "score-green";
-
             card.innerHTML = `
-                <div class="match-summary">
-                    <div class="champ-info">
-                        <img src="${match.img}" class="champ-img" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/champion/Poro.png'">
-                        <div>
-                            <span class="champ-name">${match.champion}</span>
-                            <span class="score-badge ${scoreClass}">${match.score}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="items-grid">
-                        ${itemsHtml}
-                    </div>
-
-                    <div class="stats">
-                        <div class="result-text">${match.result.toUpperCase()}</div>
-                        <div class="kda-text">${match.kda}</div>
+                <div class="champ-info">
+                    <img src="${match.img}" class="champ-img" alt="${match.champion}" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.3.1/img/champion/Poro.png'">
+                    <div>
+                        <span class="champ-name">${match.champion}</span>
+                        <span class="game-mode">Dereceli</span>
                     </div>
                 </div>
+                
+                <div class="items-grid">
+                    ${itemsHtml}
+                </div>
 
-                <div class="match-details">
-                    <div class="detail-row">
-                        <span>Seviye: <strong>${match.level}</strong></span>
-                        <span>Minyon (CS): <strong>${match.cs}</strong></span>
-                    </div>
-                    <div class="detail-extra">
-                        Maç detaylarına gitmek için <a href="#" style="color:#00bba3;">LeagueOfGraphs</a> (Temsili)
-                    </div>
+                <div class="stats">
+                    <div class="result-text">${match.result.toUpperCase()}</div>
+                    <div class="kda-text">${match.kda}</div>
                 </div>
             `;
             matchesContainer.appendChild(card);
