@@ -3,37 +3,66 @@ import time
 import random
 import json
 import os
-# DİKKAT: 'request' buraya eklendi, bu olmadan oylama çalışmaz!
+import logging
+# 'request' modülü EKLENDİ. Loglama EKLENDİ.
 from flask import Flask, jsonify, send_from_directory, request 
 import requests
 from bs4 import BeautifulSoup
 from flask_cors import CORS
 
+# --- PROFESYONEL AYARLAR ---
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
+logging.basicConfig(level=logging.INFO) # Render loglarında hatayı görmek için
+logger = logging.getLogger(__name__)
 
-# --- 1. OYLAMA SİSTEMİ ALTYAPISI ---
 VOTE_FILE = 'votes.json'
 
-def load_votes():
-    if not os.path.exists(VOTE_FILE):
-        return {}
-    try:
-        with open(VOTE_FILE, 'r') as f:
-            return json.load(f)
-    except:
-        return {}
+# --- GÜVENLİ VERİ YÖNETİCİSİ SINIFI ---
+class VoteManager:
+    def __init__(self, filename):
+        self.filename = filename
+        self.data = self.load()
 
-def save_votes(votes):
-    try:
-        with open(VOTE_FILE, 'w') as f:
-            json.dump(votes, f)
-    except:
-        pass
+    def load(self):
+        if not os.path.exists(self.filename):
+            return {}
+        try:
+            with open(self.filename, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Veritabanı okuma hatası: {e}")
+            return {} # Dosya bozuksa boş başlat
 
-votes_db = load_votes()
+    def save(self):
+        try:
+            with open(self.filename, 'w', encoding='utf-8') as f:
+                json.dump(self.data, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            logger.error(f"Veritabanı kaydetme hatası: {e}")
 
-# --- TAKİP EDİLECEK HESAPLAR LİSTESİ ---
+    def add_vote(self, match_id, points):
+        if match_id not in self.data:
+            self.data[match_id] = {"total": 0, "count": 0}
+        
+        self.data[match_id]["total"] += int(points)
+        self.data[match_id]["count"] += 1
+        self.save()
+        return self.get_average(match_id)
+
+    def get_average(self, match_id):
+        if match_id not in self.data or self.data[match_id]["count"] == 0:
+            return {"average": "-", "count": 0}
+        
+        avg = self.data[match_id]["total"] / self.data[match_id]["count"]
+        return {
+            "average": round(avg, 1),
+            "count": self.data[match_id]["count"]
+        }
+
+# Yöneticimizi başlatıyoruz
+vote_manager = VoteManager(VOTE_FILE)
+
 URL_LISTESI = [
     "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138",
     "https://www.leagueofgraphs.com/summoner/tr/D%C3%96L+VE+OKS%C4%B0JEN-011"
@@ -43,29 +72,39 @@ URL_LISTESI = [
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-# --- 2. OY VERME API'si (Eksik olan kısım burasıydı) ---
+# --- API: OY VERME ---
 @app.route('/api/vote', methods=['POST'])
 def submit_vote():
     try:
+        # Gelen veriyi kontrol et
         data = request.json
+        if not data:
+            return jsonify({"error": "Veri yok"}), 400
+
         match_id = data.get('match_id')
         points = data.get('points')
+
+        logger.info(f"Oy Geldi -> ID: {match_id}, Puan: {points}")
 
         if not match_id or points is None:
             return jsonify({"error": "Eksik bilgi"}), 400
 
-        if match_id not in votes_db:
-            votes_db[match_id] = {"total": 0, "count": 0}
+        # Oyu işle
+        result = vote_manager.add_vote(match_id, points)
+        return jsonify(result)
 
-        votes_db[match_id]["total"] += int(points)
-        votes_db[match_id]["count"] += 1
-        
-        save_votes(votes_db)
-
-        avg = votes_db[match_id]["total"] / votes_db[match_id]["count"]
-        return jsonify({"average": round(avg, 1), "count": votes_db[match_id]["count"]})
     except Exception as e:
+        logger.error(f"API Hatası: {e}")
         return jsonify({"error": str(e)}), 500
+
+# --- YARDIMCI: GÜVENLİ ID OLUŞTURUCU ---
+def generate_safe_id(text):
+    # Türkçe karakterleri ve boşlukları temizler
+    text = text.replace(" ", "").replace(":", "").replace("/", "")
+    text = text.replace("ı", "i").replace("İ", "I").replace("ö", "o").replace("Ö", "O")
+    text = text.replace("ü", "u").replace("Ü", "U").replace("ş", "s").replace("Ş", "S")
+    text = text.replace("ğ", "g").replace("Ğ", "G").replace("ç", "c").replace("Ç", "C")
+    return text
 
 def get_latest_version():
     try:
@@ -74,7 +113,7 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
-# --- TEK BİR KULLANICIYI ÇEKEN FONKSİYON ---
+# --- SCRAPER (VERİ ÇEKİCİ) ---
 def scrape_summoner(url):
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
@@ -88,8 +127,7 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # İSİM VE RANK
-        summoner_name = "Bilinmeyen Sihirdar"
+        summoner_name = "Bilinmeyen"
         try:
             title = soup.find("title").text
             summoner_name = title.split("(")[0].strip().replace(" - League of Legends", "")
@@ -104,14 +142,12 @@ def scrape_summoner(url):
                 if tier: rank_text = tier.text.strip()
         except: pass
 
-        # Profil Resmi
         profile_icon = f"{RIOT_CDN}/profileicon/29.png"
         try:
             img = soup.find("div", class_="img").find("img")
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # MAÇLAR
         matches_info = []
         all_rows = soup.find_all("tr")
         
@@ -129,14 +165,8 @@ def scrape_summoner(url):
                         parts = href.split("/")
                         if len(parts) > 3:
                             raw = parts[3].replace("-", "").replace(" ", "").lower()
-                            name_map = {
-                                "wukong": "MonkeyKing", "renata": "Renata", "fiddlesticks": "Fiddlesticks",
-                                "kais'a": "Kaisa", "kaisa": "Kaisa", "leesin": "LeeSin", "belveth": "Belveth",
-                                "missfortune": "MissFortune", "masteryi": "MasterYi", "drmundo": "DrMundo",
-                                "jarvaniv": "JarvanIV", "tahmkench": "TahmKench", "xinzhao": "XinZhao",
-                                "kogmaw": "KogMaw", "reksai": "RekSai", "aurelionsol": "AurelionSol",
-                                "twistedfate": "TwistedFate"
-                            }
+                            # Basit mapping
+                            name_map = {"wukong": "MonkeyKing", "renata": "Renata", "missfortune": "MissFortune", "masteryi": "MasterYi", "drmundo": "DrMundo", "jarvaniv": "JarvanIV", "tahmkench": "TahmKench", "xinzhao": "XinZhao", "kogmaw": "KogMaw", "reksai": "RekSai", "aurelionsol": "AurelionSol", "twistedfate": "TwistedFate", "leesin": "LeeSin", "kaisa": "Kaisa"}
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
                 
@@ -155,13 +185,11 @@ def scrape_summoner(url):
                 img_tags = row.find_all("img")
                 for img in img_tags:
                     img_str = str(img)
-                    if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str: continue
+                    if any(x in img_str for x in ["champion", "spell", "tier", "perk"]): continue
                     candidates = re.findall(r"(\d{4})", img_str)
                     for num in candidates:
                         val = int(num)
-                        if 1000 <= val <= 8000:
-                            if 5000 <= val < 6000: continue
-                            if 2020 <= val <= 2030: continue
+                        if 1000 <= val <= 8000 and not (5000 <= val < 6000) and not (2020 <= val <= 2030):
                             items.append(f"{RIOT_CDN}/item/{val}.png")
 
                 clean_items = []
@@ -176,29 +204,23 @@ def scrape_summoner(url):
                 result = "lose"
                 if "Victory" in row.text or "Zafer" in row.text: result = "win"
                 
-                # --- 3. PUANLARI ÇEK VE EKLE ---
-                # Match ID oluştururken Türkçe karakter ve boşlukları temizliyoruz
-                safe_id = f"{summoner_name}-{champ_key}-{kda_text}".replace(" ", "").replace("Ö", "O").replace("İ", "I")
+                # --- PUAN SİSTEMİ ENTEGRASYONU ---
+                # Güvenli ID oluşturuyoruz
+                raw_id = f"{summoner_name}-{champ_key}-{kda_text}"
+                match_id = generate_safe_id(raw_id)
                 
-                current_score = "-"
-                vote_count = 0
-                
-                if safe_id in votes_db:
-                    total = votes_db[safe_id]["total"]
-                    count = votes_db[safe_id]["count"]
-                    if count > 0:
-                        current_score = round(total / count, 1)
-                        vote_count = count
+                # Veritabanından çek
+                vote_data = vote_manager.get_average(match_id)
 
                 matches_info.append({
-                    "match_id": safe_id,
+                    "match_id": match_id,
                     "champion": champ_key,
                     "result": result,
                     "kda": kda_text,
                     "img": final_champ_img,
                     "items": clean_items,
-                    "user_score": current_score,
-                    "vote_count": vote_count
+                    "user_score": vote_data["average"],
+                    "vote_count": vote_data["count"]
                 })
                 if len(matches_info) >= 5: break
             except: continue
@@ -211,6 +233,7 @@ def scrape_summoner(url):
         }
 
     except Exception as e:
+        logger.error(f"Scrape Hatası: {e}")
         return {"error": str(e), "summoner": "Hata", "matches": []}
 
 @app.route('/api/get-ragnar', methods=['GET'])
