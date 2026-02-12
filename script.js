@@ -63,7 +63,7 @@ function createProfileCard(user) {
             // 2. Boşlukları Doldur (DÖNGÜ: 7 OLMALI)
             const currentCount = match.items ? match.items.length : 0;
             // Buradaki 7 sayısı slot sayısını belirler. 
-            for (let i = currentCount; i < 7; i++) {
+            for (let i = currentCount; i < 9; i++) {
                 itemsHtml += `<div class="item-slot empty"></div>`;
             }
 
@@ -95,3 +95,4 @@ function createProfileCard(user) {
 }
 
 fetchMatches();
+
