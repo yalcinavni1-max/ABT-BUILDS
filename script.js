@@ -111,7 +111,7 @@ function createProfileCard(user) {
             }
             // Boşluklar (9 Slot)
             const currentCount = match.items ? match.items.length : 0;
-            for (let i = currentCount; i < 9; i++) {
+            for (let i = currentCount; i < 10; i++) {
                 itemsHtml += `<div class="item-slot empty"></div>`;
             }
 
@@ -165,3 +165,4 @@ function createProfileCard(user) {
 }
 
 fetchMatches();
+
