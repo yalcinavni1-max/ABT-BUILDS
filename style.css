@@ -164,3 +164,63 @@ h1 {
     color: #aaa;
     font-size: 0.9rem;
 }
+/* --- OYLAMA STİLLERİ (EN ALTA EKLE) --- */
+
+.match-card {
+    cursor: pointer; /* Tıklanabilir el işareti */
+    flex-direction: column; /* Detayları alta açmak için */
+    align-items: stretch;
+}
+
+/* Puan Göstergesi (Yıldızlı Kısım) */
+.user-score-display {
+    font-size: 0.85rem;
+    font-weight: bold;
+    margin-top: 4px;
+}
+
+/* Gizli Detay Kutusu */
+.match-details {
+    display: none; /* Başlangıçta gizli */
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    text-align: center;
+    animation: fadeIn 0.3s ease;
+}
+
+/* Tıklayınca görünür yap */
+.match-card.active .match-details {
+    display: block;
+}
+
+/* Oylama Butonları Kutusu */
+.vote-buttons-container {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* Tekil Puan Butonu */
+.vote-btn {
+    background: #2c2c2c;
+    border: 1px solid #444;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.8rem;
+}
+
+.vote-btn:hover {
+    background: #00bba3;
+    border-color: #00bba3;
+    transform: scale(1.1);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
