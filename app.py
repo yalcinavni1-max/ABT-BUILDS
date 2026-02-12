@@ -17,27 +17,47 @@ URL_LISTESI = [
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-# --- NOT HESAPLAMA FONKSİYONU (Senin Kuralların) ---
+# --- GELİŞMİŞ NOT HESAPLAMA MOTORU ---
 def calculate_grade(kda_text):
     try:
-        # "Perfect" (Mükemmel) KDA ise direkt S verelim
+        # 1. "Perfect" (Hiç ölmemiş) kontrolü
         if "Perfect" in kda_text or "Mükemmel" in kda_text:
             return "S"
             
-        # Regex ile sadece sayıyı çek (Örn: "3.50:1" -> 3.50)
-        match = re.search(r"(\d+\.?\d*)", kda_text)
-        if not match:
-            return "-"
-            
-        kda = float(match.group(1))
+        # 2. Metnin içindeki sayıları bul (Örn: "3 / 9 / 15" -> [3, 9, 15])
+        # Regex ile string içindeki tüm sayıları liste olarak alıyoruz
+        numbers = re.findall(r"(\d+)", kda_text)
         
-        # Kurallar:
-        if kda >= 4.0: return "S"       # 4 ve üzeri
-        elif 3.0 <= kda < 4.0: return "A" # 3-4 arası
-        elif 2.5 <= kda < 3.0: return "B" # 2.5-3 arası
-        elif 2.0 <= kda < 2.5: return "C" # 2-2.5 arası
-        elif 1.0 < kda < 2.0: return "D"  # 1-2 arası
-        else: return "F"                  # 1 ve altı
+        kda_score = 0.0
+        
+        # Eğer en az 3 sayı bulduysak (Kill, Death, Assist) formülü uygula
+        if len(numbers) >= 3:
+            kills = float(numbers[0])
+            deaths = float(numbers[1])
+            assists = float(numbers[2])
+            
+            # KDA Formülü: (Kill + Asist) / Ölüm
+            if deaths == 0:
+                kda_score = 99.0 # Ölüm 0 ise skor sonsuzdur, direkt S alır
+            else:
+                kda_score = (kills + assists) / deaths
+                
+        else:
+            # Eğer 3 sayı bulamazsa (belki site "3.50:1" formatında vermiştir)
+            # Eski yöntemi yedek olarak kullanalım
+            match = re.search(r"(\d+\.?\d*)", kda_text)
+            if match:
+                kda_score = float(match.group(1))
+            else:
+                return "-"
+
+        # 3. Hesaplanan skora göre not ver
+        if kda_score >= 4.0: return "S"       # 4 ve üzeri
+        elif 3.0 <= kda_score < 4.0: return "A" # 3-4 arası
+        elif 2.5 <= kda_score < 3.0: return "B" # 2.5-3 arası
+        elif 2.0 <= kda_score < 2.5: return "C" # 2-2.5 arası
+        elif 1.0 < kda_score < 2.0: return "D"  # 1-2 arası
+        else: return "F"                        # 1 ve altı
         
     except:
         return "-"
@@ -49,12 +69,11 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
-# --- TEK BİR KULLANICIYI ÇEKEN FONKSİYON ---
+# --- KULLANICI ÇEKEN FONKSİYON ---
 def scrape_summoner(url):
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
-    # SENİN ÇALIŞAN HEADERS AYARLARIN (DOKUNMADIM)
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9"
@@ -126,7 +145,7 @@ def scrape_summoner(url):
                 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # İTEMLER (SENİN ÇALIŞAN MANTIĞIN)
+                # İTEMLER
                 items = []
                 img_tags = row.find_all("img")
                 for img in img_tags:
@@ -154,20 +173,17 @@ def scrape_summoner(url):
                 
                 # --- YENİ EKLENEN KISIMLAR ---
                 
-                # 1. NOT HESAPLAMA (S, A, B...)
+                # 1. NOT HESAPLAMA (DÜZELTİLDİ: (K+A)/D formülü)
                 grade = calculate_grade(kda_text)
 
                 # 2. CS ve ALTIN ÇEKME
-                # Satırın tamamındaki yazıyı alıp Regex ile avlıyoruz
                 row_text = row.text.strip()
                 
-                # CS Bulma (Örn: "185 CS")
                 cs_stat = "0 CS"
                 cs_match = re.search(r"(\d+)\s*CS", row_text)
                 if cs_match:
                     cs_stat = f"{cs_match.group(1)} CS"
 
-                # Altın Bulma (Örn: "12.4k")
                 gold_stat = "0k"
                 gold_match = re.search(r"(\d+\.?\d*)\s*k", row_text)
                 if gold_match:
@@ -179,9 +195,9 @@ def scrape_summoner(url):
                     "kda": kda_text,
                     "img": final_champ_img,
                     "items": clean_items,
-                    "grade": grade,     # Yeni
-                    "cs": cs_stat,      # Yeni
-                    "gold": gold_stat   # Yeni
+                    "grade": grade,
+                    "cs": cs_stat,
+                    "gold": gold_stat
                 })
                 if len(matches_info) >= 5: break
             except: continue
