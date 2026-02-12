@@ -2,7 +2,7 @@ import re
 import time
 import random
 from flask import Flask, jsonify, send_from_directory
-import cloudscraper # SİHİRLİ KÜTÜPHANE
+import requests
 from bs4 import BeautifulSoup
 from flask_cors import CORS
 
@@ -18,40 +18,33 @@ URL_LISTESI = [
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-# CloudScraper nesnesi oluştur (Bot korumasını aşan araç)
-scraper = cloudscraper.create_scraper(
-    browser={
-        'browser': 'chrome',
-        'platform': 'windows',
-        'desktop': True
-    }
-)
-
 def get_latest_version():
     try:
-        # Versiyon kontrolü için basit requests yeterli
-        import requests
         r = requests.get("https://ddragon.leagueoflegends.com/api/versions.json")
         if r.status_code == 200: return r.json()[0]
     except: pass
     return "14.3.1"
 
+# Oturumu koruyalım
+session = requests.Session()
+
 def scrape_summoner(url):
-    # Siteyi yormamak için kısa bekleme
-    time.sleep(random.uniform(1.0, 3.0))
+    # Siteye nefes aldırmak için bekleme
+    time.sleep(random.uniform(1.0, 2.0))
     
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
+    # Standart Chrome Başlığı (En güvenlisi)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.google.com/"
+    }
+    
     try:
-        # BURASI DEĞİŞTİ: requests yerine scraper kullanıyoruz
-        response = scraper.get(url)
-        
-        # Eğer koruma sayfası geldiyse bile scraper bunu genelde çözer.
-        if response.status_code != 200:
-            print(f"Hata Kodu: {response.status_code}")
-            return {"error": "Site Erişimi Engellendi", "summoner": "Veri Yok", "matches": []}
-
+        # Requests kullanarak çekiyoruz (Cloudscraper yok, hata vermez)
+        response = session.get(url, headers=headers, timeout=25)
         soup = BeautifulSoup(response.content, 'html.parser')
 
         # --- PROFİL ---
@@ -82,7 +75,7 @@ def scrape_summoner(url):
         
         for row in all_rows:
             try:
-                # KDA olmayan satırı atla
+                # KDA olmayan satırı atla (Maç değildir)
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
@@ -116,45 +109,39 @@ def scrape_summoner(url):
 
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (HEM RESİM HEM CLASS TARAMA)
+                # 2. İTEMLER (SAYI AVCISI MODU)
                 items = []
                 
-                # Sadece itemlerin bulunduğu alanı al
-                items_container = row.find("div", class_="items")
-                search_area = items_container if items_container else row
+                # Satırın tamamını metne çevir.
+                # <img> etiketi, <div> etiketi, class ismi... her şeye bakar.
+                row_text = str(row)
                 
-                # HTML kodunu metne çevir
-                html_text = str(search_area)
-
-                # YÖNTEM A: Resim yollarındaki sayıları bul (items/6672.png)
-                matches_img = re.findall(r"items\/[\w\/]*(\d{4})", html_text)
+                # Regex: Metin içindeki 4 haneli sayıları bul.
+                candidates = re.findall(r"(\d{4})", row_text)
                 
-                # YÖNTEM B: Class isimlerindeki sayıları bul (requireTooltip-item-6672)
-                # League of Graphs bazen item ID'sini class içine gizler.
-                matches_class = re.findall(r"item[-_]?(\d{4})", html_text)
-
-                # YÖNTEM C: Düz 4 haneli sayıları bul (img src=".../3078.png")
-                matches_raw = re.findall(r"[\"\/](\d{4})\.(png|jpg|webp)", html_text)
-                
-                # Raw match sonucunda tuple döner (id, uzantı), sadece id'yi alalım
-                raw_ids = [m[0] for m in matches_raw]
-
-                # Hepsini birleştir
-                all_candidates = matches_img + matches_class + raw_ids
-                
-                for num in all_candidates:
+                for num in candidates:
                     val = int(num)
                     
-                    # FİLTRELER
+                    # --- FİLTRELEME ---
+                    # 1000'den küçük ve 8000'den büyük sayılar item değildir.
                     if 1000 <= val <= 8000:
-                        # Yasaklı ID'ler (Yıllar, Rünler, Ekran Boyutları)
+                        
+                        # Yıllar (2024, 2025, 2026) -> İtem değil
                         if 2020 <= val <= 2030: continue
+                        
+                        # Rünler (5000-5999 arası) -> İtem değil
                         if 5000 <= val < 6000: continue
+                        
+                        # Ekran Çözünürlükleri (HTML kodunda geçebilir) -> İtem değil
                         if val in [1080, 1200, 1280, 1440, 1920, 2560]: continue
                         
+                        # Genişlik/Yükseklik değerleri (Nadir de olsa 4 hane olabilir)
+                        if val in [1024, 1600]: continue
+
+                        # Geriye kalan her şey İTEMDİR.
                         items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                # Tekrarları temizle
+                # Tekrarları Temizle
                 clean_items = []
                 seen = set()
                 for x in items:
