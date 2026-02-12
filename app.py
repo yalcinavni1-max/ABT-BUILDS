@@ -1,6 +1,4 @@
 import re
-import time
-import random
 from flask import Flask, jsonify, send_from_directory
 import requests
 from bs4 import BeautifulSoup
@@ -9,6 +7,7 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
+# --- TAKİP EDİLECEK HESAPLAR LİSTESİ ---
 URL_LISTESI = [
     "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138",
     "https://www.leagueofgraphs.com/summoner/tr/D%C3%96L+VE+OKS%C4%B0JEN-011"
@@ -25,32 +24,26 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
-# Oturumu koruyalım
-session = requests.Session()
-
+# --- TEK BİR KULLANICIYI ÇEKEN FONKSİYON ---
 def scrape_summoner(url):
-    # Siteye nefes aldırmak için bekleme
-    time.sleep(random.uniform(1.0, 2.0))
-    
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
-    # Standart Chrome Başlığı (En güvenlisi)
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.google.com/"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
     }
     
     try:
-        # Requests kullanarak çekiyoruz (Cloudscraper yok, hata vermez)
-        response = session.get(url, headers=headers, timeout=25)
+        response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # --- PROFİL ---
-        summoner_name = "Sihirdar"
+        # 1. İSİM VE RANK
+        summoner_name = "Bilinmeyen Sihirdar"
         try:
+            # Sayfa başlığından ismi çek (Daha garanti)
             title = soup.find("title").text
+            # Örn: "Ragnar Lothbrok - League of Legends..." -> Sadece ismi al
             summoner_name = title.split("(")[0].strip().replace(" - League of Legends", "")
         except: pass
 
@@ -63,23 +56,23 @@ def scrape_summoner(url):
                 if tier: rank_text = tier.text.strip()
         except: pass
 
+        # Profil Resmi
         profile_icon = f"{RIOT_CDN}/profileicon/29.png"
         try:
             img = soup.find("div", class_="img").find("img")
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # --- MAÇLAR ---
+        # 2. MAÇLAR
         matches_info = []
         all_rows = soup.find_all("tr")
         
         for row in all_rows:
             try:
-                # KDA olmayan satırı atla (Maç değildir)
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # 1. ŞAMPİYON BULMA
+                # ŞAMPİYON
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -106,49 +99,29 @@ def scrape_summoner(url):
                         if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold"]:
                             champ_key = alt.replace(" ", "").replace("'", "").replace(".", "")
                             break
-
+                
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İTEMLER (SAYI AVCISI MODU)
+                # İTEMLER
                 items = []
-                
-                # Satırın tamamını metne çevir.
-                # <img> etiketi, <div> etiketi, class ismi... her şeye bakar.
-                row_text = str(row)
-                
-                # Regex: Metin içindeki 4 haneli sayıları bul.
-                candidates = re.findall(r"(\d{4})", row_text)
-                
-                for num in candidates:
-                    val = int(num)
-                    
-                    # --- FİLTRELEME ---
-                    # 1000'den küçük ve 8000'den büyük sayılar item değildir.
-                    if 1000 <= val <= 8000:
-                        
-                        # Yıllar (2024, 2025, 2026) -> İtem değil
-                        if 2020 <= val <= 2030: continue
-                        
-                        # Rünler (5000-5999 arası) -> İtem değil
-                        if 5000 <= val < 6000: continue
-                        
-                        # Ekran Çözünürlükleri (HTML kodunda geçebilir) -> İtem değil
-                        if val in [1080, 1200, 1280, 1440, 1920, 2560]: continue
-                        
-                        # Genişlik/Yükseklik değerleri (Nadir de olsa 4 hane olabilir)
-                        if val in [1024, 1600]: continue
+                img_tags = row.find_all("img")
+                for img in img_tags:
+                    img_str = str(img)
+                    if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str: continue
+                    candidates = re.findall(r"(\d{4})", img_str)
+                    for num in candidates:
+                        val = int(num)
+                        if 1000 <= val <= 8000:
+                            if 5000 <= val < 6000: continue
+                            if 2020 <= val <= 2030: continue
+                            items.append(f"{RIOT_CDN}/item/{val}.png")
 
-                        # Geriye kalan her şey İTEMDİR.
-                        items.append(f"{RIOT_CDN}/item/{val}.png")
-
-                # Tekrarları Temizle
                 clean_items = []
                 seen = set()
                 for x in items:
                     if x not in seen:
                         clean_items.append(x)
                         seen.add(x)
-                
                 clean_items = clean_items[:7]
 
                 kda_text = kda_div.text.strip()
@@ -164,7 +137,7 @@ def scrape_summoner(url):
                 })
                 if len(matches_info) >= 5: break
             except: continue
-        
+            
         return {
             "summoner": summoner_name,
             "rank": rank_text,
@@ -175,12 +148,15 @@ def scrape_summoner(url):
     except Exception as e:
         return {"error": str(e), "summoner": "Hata", "matches": []}
 
+# --- API: TÜM KULLANICILARI DÖNDÜR ---
 @app.route('/api/get-ragnar', methods=['GET'])
 def get_all_users():
     all_data = []
+    print("Veriler çekiliyor...")
     for url in URL_LISTESI:
         data = scrape_summoner(url)
         all_data.append(data)
+    
     return jsonify(all_data)
 
 if __name__ == '__main__':
