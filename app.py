@@ -25,23 +25,20 @@ def parse_duration_to_seconds(time_str):
     except: return 1800
     return 0
 
-# --- 2. ALTIN HESAPLAMA (Senin Özel Formülün) ---
+# --- 2. ALTIN HESAPLAMA (Özel Formülün) ---
 def calculate_gold_user_formula(kills, assists, cs, duration_seconds):
     # A) Süreden Gelen Altın
-    # (Geçen süre saniye cinsinden - 65 ) * 2
     time_gold = 0
     if duration_seconds > 65:
         time_gold = (duration_seconds - 65) * 2
     
     # B) Minyondan Gelen Altın
-    # Minyon skoru * 25
     minion_gold = cs * 25
     
-    # C) Skordan Gelen Altın
-    # Kill * 350 + Asist * 100
+    # C) Skor Altını
     score_gold = (kills * 350) + (assists * 100)
     
-    # D) Toplam Hesap (Başlangıç parası 500 de eklenir ki oyun başı 0 görünmesin)
+    # D) Toplam + Başlangıç Parası
     total_gold = time_gold + minion_gold + score_gold + 500
     
     return f"{round(total_gold / 1000, 1)}k"
@@ -62,7 +59,7 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
-# --- SCRAPER (ÇALIŞAN ORİJİNAL KOD) ---
+# --- SCRAPER ---
 def scrape_summoner(url):
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
@@ -99,7 +96,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # Şampiyon Bulma
+                # ŞAMPİYON BULMA
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -111,7 +108,6 @@ def scrape_summoner(url):
                             name_map = {"wukong": "MonkeyKing", "renata": "Renata", "missfortune": "MissFortune", "masteryi": "MasterYi", "drmundo": "DrMundo", "jarvaniv": "JarvanIV", "tahmkench": "TahmKench", "xinzhao": "XinZhao", "kogmaw": "KogMaw", "reksai": "RekSai", "aurelionsol": "AurelionSol", "twistedfate": "TwistedFate", "leesin": "LeeSin", "kaisa": "Kaisa"}
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
-                
                 if champ_key == "Poro":
                     imgs = row.find_all("img")
                     for img in imgs:
@@ -121,7 +117,7 @@ def scrape_summoner(url):
                             break
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # İtemler
+                # İTEMLER
                 items = []
                 img_tags = row.find_all("img")
                 for img in img_tags:
@@ -134,20 +130,18 @@ def scrape_summoner(url):
                             if 5000 <= val < 6000: continue
                             if 2020 <= val <= 2030: continue
                             items.append(f"{RIOT_CDN}/item/{val}.png")
-                
                 clean_items = list(dict.fromkeys(items))[:9]
 
-                # VERİ İŞLEME
+                # VERİLER
                 row_text = row.text.strip()
                 kda_text = kda_div.text.strip()
                 result = "win" if "Victory" in row.text or "Zafer" in row.text else "lose"
 
-                # 1. KDA Analizi
+                # 1. KDA
                 k, d, a = 0, 0, 0
                 nums = re.findall(r"(\d+)", kda_text)
                 kda_display = "Perfect"
                 score_val = 99.0
-
                 if len(nums) >= 3:
                     k, d, a = int(nums[0]), int(nums[1]), int(nums[2])
                     if d > 0:
@@ -159,17 +153,25 @@ def scrape_summoner(url):
                     kda_display = "-"
                     score_val = 0.0
 
-                # 2. Not
+                # 2. NOT
                 grade = calculate_grade(score_val)
 
-                # 3. CS (Minyon)
+                # 3. CS (MİNYON) DÜZELTİLDİ
                 cs_val = 0
-                cs_match = re.search(r"(\d+)\s*CS", row_text, re.IGNORECASE)
-                if cs_match:
-                    cs_val = int(cs_match.group(1))
+                # Önce HTML class'ına bak (En garantisi bu)
+                cs_div = row.find("div", class_="minions")
+                if cs_div:
+                    # Sadece sayıyı al (Örn: "24" veya "24 CS")
+                    num_match = re.search(r"(\d+)", cs_div.text)
+                    if num_match: cs_val = int(num_match.group(1))
+                else:
+                    # Bulamazsa metin taraması yap
+                    cs_match = re.search(r"(\d+)\s*CS", row_text, re.IGNORECASE)
+                    if cs_match: cs_val = int(cs_match.group(1))
+                
                 cs_stat = f"{cs_val} CS"
 
-                # 4. Süre Bulma
+                # 4. SÜRE
                 duration_sec = 0
                 dur_div = row.find("div", class_="gameDuration")
                 if dur_div:
@@ -177,9 +179,9 @@ def scrape_summoner(url):
                 else:
                     time_match = re.search(r"(\d{1,2}:\d{2})", row_text)
                     if time_match: duration_sec = parse_duration_to_seconds(time_match.group(1))
-                    else: duration_sec = 1500 
+                    else: duration_sec = 1500
 
-                # 5. ALTIN HESAPLA (Senin Özel Formülün)
+                # 5. ALTIN HESAPLA (Senin Formülün)
                 gold_stat = calculate_gold_user_formula(k, a, cs_val, duration_sec)
 
                 matches_info.append({
