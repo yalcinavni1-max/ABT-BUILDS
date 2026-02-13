@@ -3,8 +3,6 @@ from flask import Flask, jsonify, send_from_directory
 import requests
 from bs4 import BeautifulSoup
 from flask_cors import CORS
-import time
-import random
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
@@ -34,12 +32,12 @@ def parse_duration_to_seconds(time_str):
     except: return 1800 # Hata olursa 30dk varsay
     return 0
 
-# --- 2. ALTIN HESAPLAMA (EN TUTARLI FORMÜL) ---
-def calculate_gold_stable(kills, assists, cs, duration_seconds):
+# --- 2. ALTIN HESAPLAMA (MATEMATİKSEL SİSTEM - İLK VERSİYON) ---
+def calculate_gold_math(kills, assists, cs, duration_seconds):
     # A) Başlangıç Parası
     gold = 500 
     
-    # B) Minyon Geliri (Ortalama 21g - En tutarlısı budur)
+    # B) Minyon Geliri (Ortalama 21g - En tutarlı değer)
     gold += (cs * 21)
     
     # C) Skor Geliri
@@ -63,11 +61,8 @@ def calculate_grade(score):
     elif score >= 1.0: return "D"
     else: return "F"
 
-# --- SCRAPER ---
+# --- SCRAPER (SENİN ÇALIŞAN ORİJİNAL KODUN) ---
 def scrape_summoner(url):
-    # Bot koruması
-    time.sleep(random.uniform(0.3, 0.8))
-    
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
@@ -103,7 +98,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # ŞAMPİYON BULMA
+                # --- ŞAMPİYON BULMA (ORİJİNAL KOD) ---
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -124,7 +119,7 @@ def scrape_summoner(url):
                             break
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # İTEMLER
+                # --- İTEMLER (ORİJİNAL KOD - RESİMLER GELİR) ---
                 items = []
                 img_tags = row.find_all("img")
                 for img in img_tags:
@@ -139,12 +134,12 @@ def scrape_summoner(url):
                             items.append(f"{RIOT_CDN}/item/{val}.png")
                 clean_items = list(dict.fromkeys(items))[:9]
 
-                # VERİ İŞLEME
+                # --- VERİ İŞLEME ---
                 row_text = row.text.strip()
                 kda_text = kda_div.text.strip()
                 result = "win" if "Victory" in row.text or "Zafer" in row.text else "lose"
 
-                # 1. KDA
+                # 1. KDA Analizi
                 nums = re.findall(r"(\d+)", kda_text)
                 kda_display = "Perfect"
                 score_val = 99.0
@@ -159,12 +154,11 @@ def scrape_summoner(url):
                     kda_display = "-"
                     score_val = 0.0
 
-                # 2. NOT
                 grade = calculate_grade(score_val)
 
-                # 3. CS (Minyon) - Destek Rolü İçin Düzeltilmiş
+                # 2. CS (Minyon) - Destek için düzeltilmiş
                 cs_val = 0
-                cs_div = row.find("div", class_="minions") # Önce özel kutuya bak
+                cs_div = row.find("div", class_="minions")
                 if cs_div:
                     num_match = re.search(r"(\d+)", cs_div.text)
                     if num_match: cs_val = int(num_match.group(1))
@@ -173,7 +167,7 @@ def scrape_summoner(url):
                     if cs_match: cs_val = int(cs_match.group(1))
                 cs_stat = f"{cs_val} CS"
 
-                # 4. SÜRE BULMA
+                # 3. Süre Bulma
                 duration_sec = 0
                 dur_div = row.find("div", class_="gameDuration")
                 if dur_div:
@@ -183,8 +177,8 @@ def scrape_summoner(url):
                     if time_match: duration_sec = parse_duration_to_seconds(time_match.group(1))
                     else: duration_sec = 1500 
 
-                # 5. ALTIN HESAPLA (Kararlı Formül)
-                gold_stat = calculate_gold_stable(k, a, cs_val, duration_sec)
+                # 4. ALTIN HESAPLA (Matematiksel)
+                gold_stat = calculate_gold_math(k, a, cs_val, duration_sec)
 
                 matches_info.append({
                     "champion": champ_key,
@@ -194,7 +188,7 @@ def scrape_summoner(url):
                     "items": clean_items,
                     "grade": grade,
                     "cs": cs_stat,
-                    "gold": gold_stat,
+                    "gold": gold_stat, 
                     "kda_score": kda_display
                 })
                 if len(matches_info) >= 5: break
