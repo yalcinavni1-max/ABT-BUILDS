@@ -7,6 +7,7 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
+# --- TAKİP EDİLECEK HESAPLAR LİSTESİ ---
 URL_LISTESI = [
     "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138",
     "https://www.leagueofgraphs.com/summoner/tr/D%C3%96L+VE+OKS%C4%B0JEN-011"
@@ -16,6 +17,49 @@ URL_LISTESI = [
 def serve_index():
     return send_from_directory('.', 'index.html')
 
+# --- 1. ALTIN HESAPLAMA (MATEMATİKSEL TAHMİN) ---
+def estimate_gold(kills, deaths, assists, cs):
+    # Başlangıç: 500
+    # Pasif Gelir (Ortalama maç süresine göre): ~3500
+    # Kill: 300, Asist: 150, CS: 21
+    base = 4000 
+    gold = base + (kills * 300) + (assists * 150) + (cs * 21)
+    # Binlik formata çevir (Örn: 12.5k)
+    return f"{round(gold / 1000, 1)}k"
+
+# --- 2. LEVEL HESAPLAMA (İTEM SAYISINA GÖRE) ---
+def estimate_level(item_count):
+    if item_count >= 5: return "17-18"
+    elif item_count == 4: return "15-16"
+    elif item_count == 3: return "12-14"
+    elif item_count == 2: return "9-11"
+    elif item_count == 1: return "6-8"
+    else: return "1-5"
+
+# --- 3. NOT HESAPLAMA (KDA'YA GÖRE) ---
+def calculate_grade(kda_text):
+    try:
+        if "Perfect" in kda_text or "Mükemmel" in kda_text: return "S"
+        
+        # Sayıları ayıkla
+        nums = re.findall(r"(\d+)", kda_text)
+        if len(nums) >= 3:
+            k = float(nums[0])
+            d = float(nums[1])
+            a = float(nums[2])
+            
+            # Formül: (Kill + Asist) / Death
+            score = (k + a) / d if d > 0 else 99
+            
+            if score >= 4.0: return "S"
+            elif score >= 3.0: return "A"
+            elif score >= 2.5: return "B"
+            elif score >= 2.0: return "C"
+            elif score >= 1.0: return "D"
+            else: return "F"
+    except: pass
+    return "-"
+
 def get_latest_version():
     try:
         r = requests.get("https://ddragon.leagueoflegends.com/api/versions.json")
@@ -23,49 +67,12 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
-# --- 1. SÜRE ÇEVİRİCİ ---
-def parse_duration_to_seconds(time_str):
-    try:
-        parts = time_str.split(':')
-        if len(parts) == 2: return int(parts[0]) * 60 + int(parts[1])
-        elif len(parts) == 3: return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-    except: return 1800 # Hata olursa 30dk varsay
-    return 0
-
-# --- 2. ALTIN HESAPLAMA (MATEMATİKSEL SİSTEM - İLK VERSİYON) ---
-def calculate_gold_math(kills, assists, cs, duration_seconds):
-    # A) Başlangıç Parası
-    gold = 500 
-    
-    # B) Minyon Geliri (Ortalama 21g - En tutarlı değer)
-    gold += (cs * 21)
-    
-    # C) Skor Geliri
-    gold += (kills * 300)
-    gold += (assists * 150) # Asist ortalaması
-    
-    # D) Pasif Gelir (Süre Bazlı)
-    # 1:05 (65. saniye) sonra başlar, saniyede ~2.04 altın
-    if duration_seconds > 65:
-        passive_time = duration_seconds - 65
-        gold += (passive_time * 2.04)
-        
-    return f"{round(gold / 1000, 1)}k"
-
-# --- 3. NOT HESAPLAMA ---
-def calculate_grade(score):
-    if score >= 4.0: return "S"
-    elif score >= 3.0: return "A"
-    elif score >= 2.5: return "B"
-    elif score >= 2.0: return "C"
-    elif score >= 1.0: return "D"
-    else: return "F"
-
-# --- SCRAPER (SENİN ÇALIŞAN ORİJİNAL KODUN) ---
+# --- TEK BİR KULLANICIYI ÇEKEN FONKSİYON (SENİN KODUN) ---
 def scrape_summoner(url):
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
+    # BU HEADERS SENİN ÇALIŞAN KODUNDAN ALINDI - DOKUNULMADI
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9"
@@ -75,21 +82,30 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # İsim ve Rank
+        # 1. İSİM VE RANK
         summoner_name = "Bilinmeyen Sihirdar"
-        try: summoner_name = soup.find("title").text.split("(")[0].strip().replace(" - League of Legends", "")
+        try:
+            title = soup.find("title").text
+            summoner_name = title.split("(")[0].strip().replace(" - League of Legends", "")
         except: pass
 
         rank_text = "Unranked"
         try:
-            banner = soup.find("div", class_="bannerSubtitle")
-            rank_text = banner.text.strip() if banner else soup.find("div", class_="league-tier").text.strip()
+            banner_sub = soup.find("div", class_="bannerSubtitle")
+            if banner_sub: rank_text = banner_sub.text.strip()
+            else:
+                tier = soup.find("div", class_="league-tier")
+                if tier: rank_text = tier.text.strip()
         except: pass
 
+        # Profil Resmi
         profile_icon = f"{RIOT_CDN}/profileicon/29.png"
-        try: profile_icon = "https:" + soup.find("div", class_="img").find("img").get("src")
+        try:
+            img = soup.find("div", class_="img").find("img")
+            if img: profile_icon = "https:" + img.get("src")
         except: pass
 
+        # 2. MAÇLAR
         matches_info = []
         all_rows = soup.find_all("tr")
         
@@ -98,7 +114,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # --- ŞAMPİYON BULMA (ORİJİNAL KOD) ---
+                # --- ŞAMPİYON BULMA (SENİN ORİJİNAL KODUN) ---
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -107,9 +123,17 @@ def scrape_summoner(url):
                         parts = href.split("/")
                         if len(parts) > 3:
                             raw = parts[3].replace("-", "").replace(" ", "").lower()
-                            name_map = {"wukong": "MonkeyKing", "renata": "Renata", "missfortune": "MissFortune", "masteryi": "MasterYi", "drmundo": "DrMundo", "jarvaniv": "JarvanIV", "tahmkench": "TahmKench", "xinzhao": "XinZhao", "kogmaw": "KogMaw", "reksai": "RekSai", "aurelionsol": "AurelionSol", "twistedfate": "TwistedFate", "leesin": "LeeSin", "kaisa": "Kaisa"}
+                            name_map = {
+                                "wukong": "MonkeyKing", "renata": "Renata", "fiddlesticks": "Fiddlesticks",
+                                "kais'a": "Kaisa", "kaisa": "Kaisa", "leesin": "LeeSin", "belveth": "Belveth",
+                                "missfortune": "MissFortune", "masteryi": "MasterYi", "drmundo": "DrMundo",
+                                "jarvaniv": "JarvanIV", "tahmkench": "TahmKench", "xinzhao": "XinZhao",
+                                "kogmaw": "KogMaw", "reksai": "RekSai", "aurelionsol": "AurelionSol",
+                                "twistedfate": "TwistedFate"
+                            }
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
+                
                 if champ_key == "Poro":
                     imgs = row.find_all("img")
                     for img in imgs:
@@ -117,9 +141,10 @@ def scrape_summoner(url):
                         if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold"]:
                             champ_key = alt.replace(" ", "").replace("'", "").replace(".", "")
                             break
+                
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # --- İTEMLER (ORİJİNAL KOD - RESİMLER GELİR) ---
+                # --- İTEMLER (SENİN ORİJİNAL KODUN) ---
                 items = []
                 img_tags = row.find_all("img")
                 for img in img_tags:
@@ -132,53 +157,55 @@ def scrape_summoner(url):
                             if 5000 <= val < 6000: continue
                             if 2020 <= val <= 2030: continue
                             items.append(f"{RIOT_CDN}/item/{val}.png")
-                clean_items = list(dict.fromkeys(items))[:9]
 
-                # --- VERİ İŞLEME ---
-                row_text = row.text.strip()
+                clean_items = []
+                seen = set()
+                for x in items:
+                    if x not in seen:
+                        clean_items.append(x)
+                        seen.add(x)
+                clean_items = clean_items[:9]
+
                 kda_text = kda_div.text.strip()
-                result = "win" if "Victory" in row.text or "Zafer" in row.text else "lose"
+                result = "lose"
+                if "Victory" in row.text or "Zafer" in row.text: result = "win"
+                
+                # --- YENİ EKLENEN HESAPLAMA KISMI (ORİJİNAL AKIŞI BOZMADAN SONA EKLENDİ) ---
+                
+                # 1. NOT HESAPLA
+                grade = calculate_grade(kda_text)
 
-                # 1. KDA Analizi
-                nums = re.findall(r"(\d+)", kda_text)
-                kda_display = "Perfect"
-                score_val = 99.0
-                k, d, a = 0, 0, 0
-                if len(nums) >= 3:
-                    k, d, a = int(nums[0]), int(nums[1]), int(nums[2])
-                    if d > 0:
-                        score_val = (k + a) / d
+                # 2. CS (Minyon) BUL
+                cs_stat = "0 CS"
+                cs_val = 0
+                cs_match = re.search(r"(\d+)\s*CS", row.text)
+                if cs_match:
+                    cs_val = int(cs_match.group(1))
+                    cs_stat = f"{cs_val} CS"
+                
+                # 3. KDA SAYILARINI AYRIŞTIR (Altın hesabı için)
+                k_num, d_num, a_num = 0, 0, 0
+                kda_nums = re.findall(r"(\d+)", kda_text)
+                if len(kda_nums) >= 3:
+                    k_num = int(kda_nums[0])
+                    d_num = int(kda_nums[1])
+                    a_num = int(kda_nums[2])
+                    
+                    # KDA Skoru (Arayüzde göstermek için)
+                    if d_num == 0:
+                        kda_display = "Perfect"
+                    else:
+                        score_val = (k_num + a_num) / d_num
                         kda_display = "{:.2f}".format(score_val)
-                    else: score_val = 99.0
                 else:
                     kda_display = "-"
-                    score_val = 0.0
 
-                grade = calculate_grade(score_val)
+                # 4. ALTIN HESAPLA (Tahmini)
+                gold_stat = estimate_gold(k_num, d_num, a_num, cs_val)
 
-                # 2. CS (Minyon) - Destek için düzeltilmiş
-                cs_val = 0
-                cs_div = row.find("div", class_="minions")
-                if cs_div:
-                    num_match = re.search(r"(\d+)", cs_div.text)
-                    if num_match: cs_val = int(num_match.group(1))
-                else:
-                    cs_match = re.search(r"(\d+)\s*CS", row_text, re.IGNORECASE)
-                    if cs_match: cs_val = int(cs_match.group(1))
-                cs_stat = f"{cs_val} CS"
-
-                # 3. Süre Bulma
-                duration_sec = 0
-                dur_div = row.find("div", class_="gameDuration")
-                if dur_div:
-                    duration_sec = parse_duration_to_seconds(dur_div.text.strip())
-                else:
-                    time_match = re.search(r"(\d{1,2}:\d{2})", row_text)
-                    if time_match: duration_sec = parse_duration_to_seconds(time_match.group(1))
-                    else: duration_sec = 1500 
-
-                # 4. ALTIN HESAPLA (Matematiksel)
-                gold_stat = calculate_gold_math(k, a, cs_val, duration_sec)
+                # 5. LEVEL HESAPLA (Tahmini - İtem sayısına göre)
+                raw_level = estimate_level(len(clean_items))
+                level_stat = f"Lvl {raw_level}"
 
                 matches_info.append({
                     "champion": champ_key,
@@ -186,25 +213,33 @@ def scrape_summoner(url):
                     "kda": kda_text,
                     "img": final_champ_img,
                     "items": clean_items,
-                    "grade": grade,
-                    "cs": cs_stat,
-                    "gold": gold_stat, 
-                    "kda_score": kda_display
+                    "grade": grade,       # Yeni
+                    "cs": cs_stat,        # Yeni
+                    "gold": gold_stat,    # Yeni
+                    "kda_score": kda_display # Yeni (Seviye yerine bu görünecek)
                 })
                 if len(matches_info) >= 5: break
             except: continue
-        
-        return {"summoner": summoner_name, "rank": rank_text, "icon": profile_icon, "matches": matches_info}
+            
+        return {
+            "summoner": summoner_name,
+            "rank": rank_text,
+            "icon": profile_icon,
+            "matches": matches_info
+        }
 
     except Exception as e:
         return {"error": str(e), "summoner": "Hata", "matches": []}
 
+# --- API: TÜM KULLANICILARI DÖNDÜR ---
 @app.route('/api/get-ragnar', methods=['GET'])
 def get_all_users():
     all_data = []
     print("Veriler çekiliyor...")
     for url in URL_LISTESI:
-        all_data.append(scrape_summoner(url))
+        data = scrape_summoner(url)
+        all_data.append(data)
+    
     return jsonify(all_data)
 
 if __name__ == '__main__':
