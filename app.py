@@ -7,10 +7,6 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# --- GLOBAL DEĞİŞKENLER ---
-# İtem fiyatlarını burada tutacağız {ItemID: Fiyat}
-ITEM_PRICES = {}
-
 URL_LISTESI = [
     "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138",
     "https://www.leagueofgraphs.com/summoner/tr/D%C3%96L+VE+OKS%C4%B0JEN-011"
@@ -20,33 +16,39 @@ URL_LISTESI = [
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-def get_latest_version():
+# --- 1. SÜRE ÇEVİRİCİ ---
+def parse_duration_to_seconds(time_str):
     try:
-        r = requests.get("https://ddragon.leagueoflegends.com/api/versions.json")
-        if r.status_code == 200: return r.json()[0]
-    except: pass
-    return "14.3.1"
+        parts = time_str.split(':')
+        if len(parts) == 2: return int(parts[0]) * 60 + int(parts[1])
+        elif len(parts) == 3: return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    except: return 1800
+    return 0
 
-# --- 1. İTEM FİYATLARINI YÜKLEME ---
-# Uygulama açılınca bir kere çalışır, tüm itemlerin fiyatını öğrenir.
-def load_item_data():
-    global ITEM_PRICES
-    version = get_latest_version()
-    print(f"İtem veritabanı yükleniyor... (Versiyon: {version})")
-    try:
-        url = f"https://ddragon.leagueoflegends.com/cdn/{version}/data/en_US/item.json"
-        r = requests.get(url)
-        if r.status_code == 200:
-            data = r.json()['data']
-            for item_id, item_info in data.items():
-                # İtemin toplam altın değeri
-                if 'gold' in item_info:
-                    ITEM_PRICES[int(item_id)] = item_info['gold']['total']
-            print("İtem fiyatları başarıyla yüklendi.")
-    except Exception as e:
-        print(f"İtem verileri çekilemedi: {e}")
+# --- 2. ALTIN HESAPLAMA MOTORU (GELİŞMİŞ TABLO MODU) ---
+def calculate_gold_smart(kills, assists, cs, duration_seconds):
+    # A) Başlangıç Parası
+    gold = 500 
+    
+    # B) Minyon Geliri (Senin Tablona Göre Polinom Hesabı)
+    # Formül: 0.0135*CS^2 + 17.7*CS + 10
+    # Bu formül 107 CS'de ~2061, 234 CS'de ~4896 verir.
+    cs_gold = (0.0135 * (cs ** 2)) + (17.7 * cs) + 10
+    gold += cs_gold
+    
+    # C) Skor Geliri (Senin İsteğin: Kill*300, Asist*100)
+    gold += (kills * 300)
+    gold += (assists * 100)
+    
+    # D) Pasif Gelir (Süre Bazlı)
+    # 1:05 (65. saniye) sonra başlar, saniyede ~2.04 altın
+    if duration_seconds > 65:
+        passive_time = duration_seconds - 65
+        gold += (passive_time * 2.04)
+        
+    return f"{round(gold / 1000, 1)}k"
 
-# --- 2. NOT HESAPLAMA ---
+# --- 3. NOT HESAPLAMA ---
 def calculate_grade(score):
     if score >= 4.0: return "S"
     elif score >= 3.0: return "A"
@@ -55,7 +57,14 @@ def calculate_grade(score):
     elif score >= 1.0: return "D"
     else: return "F"
 
-# --- SCRAPER ---
+def get_latest_version():
+    try:
+        r = requests.get("https://ddragon.leagueoflegends.com/api/versions.json")
+        if r.status_code == 200: return r.json()[0]
+    except: pass
+    return "14.3.1"
+
+# --- SCRAPER (ÇALIŞAN ORİJİNAL KOD) ---
 def scrape_summoner(url):
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
@@ -92,7 +101,7 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # ŞAMPİYON
+                # --- ŞAMPİYON BULMA (SAĞLAMLAŞTIRILMIŞ) ---
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -101,10 +110,12 @@ def scrape_summoner(url):
                         parts = href.split("/")
                         if len(parts) > 3:
                             raw = parts[3].replace("-", "").replace(" ", "").lower()
-                            name_map = {"wukong": "MonkeyKing", "renata": "Renata", "fiddlesticks": "Fiddlesticks", "kais'a": "Kaisa", "kaisa": "Kaisa", "leesin": "LeeSin", "belveth": "Belveth", "missfortune": "MissFortune", "masteryi": "MasterYi", "drmundo": "DrMundo", "jarvaniv": "JarvanIV", "tahmkench": "TahmKench", "xinzhao": "XinZhao", "kogmaw": "KogMaw", "reksai": "RekSai", "aurelionsol": "AurelionSol", "twistedfate": "TwistedFate"}
+                            name_map = {
+                                "wukong": "MonkeyKing", "renata": "Renata", "missfortune": "MissFortune", "masteryi": "MasterYi", "drmundo": "DrMundo", "jarvaniv": "JarvanIV", "tahmkench": "TahmKench", "xinzhao": "XinZhao", "kogmaw": "KogMaw", "reksai": "RekSai", "aurelionsol": "AurelionSol", "twistedfate": "TwistedFate", "leesin": "LeeSin", "kaisa": "Kaisa"}
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
                 
+                # Yedek Poro Kontrolü
                 if champ_key == "Poro":
                     imgs = row.find_all("img")
                     for img in imgs:
@@ -114,48 +125,33 @@ def scrape_summoner(url):
                             break
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # --- İTEMLERİ TOPLA VE FİYAT HESAPLA ---
+                # --- İTEMLER ---
                 items = []
-                total_inventory_value = 0 # Envanter değeri
-                
                 img_tags = row.find_all("img")
                 for img in img_tags:
                     img_str = str(img)
                     if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str: continue
-                    
-                    # Regex ile item ID'sini çekiyoruz
                     candidates = re.findall(r"(\d{4})", img_str)
                     for num in candidates:
                         val = int(num)
                         if 1000 <= val <= 8000:
                             if 5000 <= val < 6000: continue
                             if 2020 <= val <= 2030: continue
-                            
-                            # İtemi listeye ekle
                             items.append(f"{RIOT_CDN}/item/{val}.png")
-                            
-                            # İtemin fiyatını bul ve topla
-                            if val in ITEM_PRICES:
-                                total_inventory_value += ITEM_PRICES[val]
-                            else:
-                                # Fiyatı listede yoksa ortalama bir değer ekle (Bazen yeni itemler gecikir)
-                                total_inventory_value += 2500 
-
+                
                 clean_items = list(dict.fromkeys(items))[:9]
 
-                # --- ALTIN HESABI (İTEMLER + TAHMİNİ CEP HARÇLIĞI) ---
-                # İtemlerin toplamı + 750 Gold (Potlar, Wardlar ve cepte kalan para)
-                final_gold_value = total_inventory_value + 750
-                gold_stat = f"{round(final_gold_value / 1000, 1)}k"
-
-                # --- DİĞER VERİLER ---
+                # --- VERİ İŞLEME ---
+                row_text = row.text.strip()
                 kda_text = kda_div.text.strip()
                 result = "win" if "Victory" in row.text or "Zafer" in row.text else "lose"
 
-                # KDA Ayrıştırma
+                # 1. KDA ANALİZİ
+                k, d, a = 0, 0, 0
                 nums = re.findall(r"(\d+)", kda_text)
                 kda_display = "Perfect"
-                score_val = 0.0
+                score_val = 99.0
+
                 if len(nums) >= 3:
                     k, d, a = int(nums[0]), int(nums[1]), int(nums[2])
                     if d > 0:
@@ -163,15 +159,32 @@ def scrape_summoner(url):
                         kda_display = "{:.2f}".format(score_val)
                     else:
                         score_val = 99.0
+                else:
+                    kda_display = "-"
+                    score_val = 0.0
 
+                # 2. NOT
                 grade = calculate_grade(score_val)
 
-                # CS
+                # 3. CS (Minyon)
                 cs_val = 0
-                cs_match = re.search(r"(\d+)\s*CS", row.text, re.IGNORECASE)
+                cs_match = re.search(r"(\d+)\s*CS", row_text, re.IGNORECASE)
                 if cs_match:
                     cs_val = int(cs_match.group(1))
                 cs_stat = f"{cs_val} CS"
+
+                # 4. SÜRE BULMA
+                duration_sec = 0
+                dur_div = row.find("div", class_="gameDuration")
+                if dur_div:
+                    duration_sec = parse_duration_to_seconds(dur_div.text.strip())
+                else:
+                    time_match = re.search(r"(\d{1,2}:\d{2})", row_text)
+                    if time_match: duration_sec = parse_duration_to_seconds(time_match.group(1))
+                    else: duration_sec = 1500 # Bulamazsa 25 dk
+
+                # 5. ALTIN HESAPLA (YENİ FORMÜL)
+                gold_stat = calculate_gold_smart(k, a, cs_val, duration_sec)
 
                 matches_info.append({
                     "champion": champ_key,
@@ -181,7 +194,7 @@ def scrape_summoner(url):
                     "items": clean_items,
                     "grade": grade,
                     "cs": cs_stat,
-                    "gold": gold_stat, # İtem bazlı hesaplanmış altın
+                    "gold": gold_stat,
                     "kda_score": kda_display
                 })
                 if len(matches_info) >= 5: break
@@ -195,13 +208,9 @@ def scrape_summoner(url):
 @app.route('/api/get-ragnar', methods=['GET'])
 def get_all_users():
     all_data = []
-    print("Veriler çekiliyor...")
     for url in URL_LISTESI:
         all_data.append(scrape_summoner(url))
     return jsonify(all_data)
 
-# --- UYGULAMA BAŞLANGICI ---
 if __name__ == '__main__':
-    # Önce item fiyatlarını indiriyoruz
-    load_item_data()
     app.run(host='0.0.0.0', port=5000)
