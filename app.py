@@ -7,6 +7,9 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
+# --- GLOBAL İTEM FİYAT LİSTESİ ---
+ITEM_PRICES = {}
+
 URL_LISTESI = [
     "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138",
     "https://www.leagueofgraphs.com/summoner/tr/D%C3%96L+VE+OKS%C4%B0JEN-011"
@@ -16,34 +19,32 @@ URL_LISTESI = [
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-# --- 1. SÜRE ÇEVİRİCİ ---
-def parse_duration_to_seconds(time_str):
+def get_latest_version():
     try:
-        parts = time_str.split(':')
-        if len(parts) == 2: return int(parts[0]) * 60 + int(parts[1])
-        elif len(parts) == 3: return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-    except: return 1800
-    return 0
+        r = requests.get("https://ddragon.leagueoflegends.com/api/versions.json")
+        if r.status_code == 200: return r.json()[0]
+    except: pass
+    return "14.3.1"
 
-# --- 2. ALTIN HESAPLAMA (Özel Formülün) ---
-def calculate_gold_user_formula(kills, assists, cs, duration_seconds):
-    # A) Süreden Gelen Altın
-    time_gold = 0
-    if duration_seconds > 65:
-        time_gold = (duration_seconds - 65) * 2
-    
-    # B) Minyondan Gelen Altın
-    minion_gold = cs * 25
-    
-    # C) Skor Altını
-    score_gold = (kills * 350) + (assists * 100)
-    
-    # D) Toplam + Başlangıç Parası
-    total_gold = time_gold + minion_gold + score_gold + 500
-    
-    return f"{round(total_gold / 1000, 1)}k"
+# --- 1. İTEM FİYATLARINI ÇEKEN FONKSİYON ---
+# Uygulama başlarken bir kere çalışır, tüm fiyatları hafızaya alır.
+def load_item_prices():
+    global ITEM_PRICES
+    version = get_latest_version()
+    print(f"İtem fiyatları Riot sunucusundan çekiliyor... (v{version})")
+    try:
+        url = f"https://ddragon.leagueoflegends.com/cdn/{version}/data/en_US/item.json"
+        r = requests.get(url)
+        if r.status_code == 200:
+            data = r.json()['data']
+            for item_id, info in data.items():
+                if 'gold' in info:
+                    ITEM_PRICES[int(item_id)] = info['gold']['total']
+            print(f"Başarılı! {len(ITEM_PRICES)} adet item fiyatı yüklendi.")
+    except Exception as e:
+        print(f"İtem fiyatları yüklenirken hata: {e}")
 
-# --- 3. NOT HESAPLAMA ---
+# --- 2. NOT HESAPLAMA ---
 def calculate_grade(score):
     if score >= 4.0: return "S"
     elif score >= 3.0: return "A"
@@ -52,14 +53,7 @@ def calculate_grade(score):
     elif score >= 1.0: return "D"
     else: return "F"
 
-def get_latest_version():
-    try:
-        r = requests.get("https://ddragon.leagueoflegends.com/api/versions.json")
-        if r.status_code == 200: return r.json()[0]
-    except: pass
-    return "14.3.1"
-
-# --- SCRAPER ---
+# --- SCRAPER (SENİN ÇALIŞAN ORİJİNAL KODUN) ---
 def scrape_summoner(url):
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
@@ -117,8 +111,10 @@ def scrape_summoner(url):
                             break
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # İTEMLER
+                # --- İTEMLER VE FİYAT HESAPLAMA ---
                 items = []
+                current_match_gold = 0 # Bu maçtaki itemlerin toplam fiyatı
+                
                 img_tags = row.find_all("img")
                 for img in img_tags:
                     img_str = str(img)
@@ -126,19 +122,31 @@ def scrape_summoner(url):
                     candidates = re.findall(r"(\d{4})", img_str)
                     for num in candidates:
                         val = int(num)
+                        # Senin item filtrelerin (Çalışan koddan)
                         if 1000 <= val <= 8000:
                             if 5000 <= val < 6000: continue
                             if 2020 <= val <= 2030: continue
+                            
+                            # İtemi ekle
                             items.append(f"{RIOT_CDN}/item/{val}.png")
+                            
+                            # Fiyatını topla (Riot veritabanından bakarak)
+                            if val in ITEM_PRICES:
+                                current_match_gold += ITEM_PRICES[val]
+                            else:
+                                current_match_gold += 2500 # Fiyatı bulunamazsa ortalama ekle
+                
                 clean_items = list(dict.fromkeys(items))[:9]
 
-                # VERİLER
-                row_text = row.text.strip()
+                # --- ALTIN HESABI (İTEMLER + 900) ---
+                total_gold = current_match_gold + 900
+                gold_stat = f"{round(total_gold / 1000, 1)}k"
+
+                # --- DİĞER VERİLER ---
                 kda_text = kda_div.text.strip()
                 result = "win" if "Victory" in row.text or "Zafer" in row.text else "lose"
 
-                # 1. KDA
-                k, d, a = 0, 0, 0
+                # KDA
                 nums = re.findall(r"(\d+)", kda_text)
                 kda_display = "Perfect"
                 score_val = 99.0
@@ -147,42 +155,23 @@ def scrape_summoner(url):
                     if d > 0:
                         score_val = (k + a) / d
                         kda_display = "{:.2f}".format(score_val)
-                    else:
-                        score_val = 99.0
+                    else: score_val = 99.0
                 else:
                     kda_display = "-"
                     score_val = 0.0
 
-                # 2. NOT
                 grade = calculate_grade(score_val)
 
-                # 3. CS (MİNYON) DÜZELTİLDİ
+                # CS (Minyon) - Düzeltilmiş Arama
                 cs_val = 0
-                # Önce HTML class'ına bak (En garantisi bu)
                 cs_div = row.find("div", class_="minions")
                 if cs_div:
-                    # Sadece sayıyı al (Örn: "24" veya "24 CS")
                     num_match = re.search(r"(\d+)", cs_div.text)
                     if num_match: cs_val = int(num_match.group(1))
                 else:
-                    # Bulamazsa metin taraması yap
-                    cs_match = re.search(r"(\d+)\s*CS", row_text, re.IGNORECASE)
+                    cs_match = re.search(r"(\d+)\s*CS", row.text, re.IGNORECASE)
                     if cs_match: cs_val = int(cs_match.group(1))
-                
                 cs_stat = f"{cs_val} CS"
-
-                # 4. SÜRE
-                duration_sec = 0
-                dur_div = row.find("div", class_="gameDuration")
-                if dur_div:
-                    duration_sec = parse_duration_to_seconds(dur_div.text.strip())
-                else:
-                    time_match = re.search(r"(\d{1,2}:\d{2})", row_text)
-                    if time_match: duration_sec = parse_duration_to_seconds(time_match.group(1))
-                    else: duration_sec = 1500
-
-                # 5. ALTIN HESAPLA (Senin Formülün)
-                gold_stat = calculate_gold_user_formula(k, a, cs_val, duration_sec)
 
                 matches_info.append({
                     "champion": champ_key,
@@ -192,7 +181,7 @@ def scrape_summoner(url):
                     "items": clean_items,
                     "grade": grade,
                     "cs": cs_stat,
-                    "gold": gold_stat,
+                    "gold": gold_stat, # İtem + 900 hesabı
                     "kda_score": kda_display
                 })
                 if len(matches_info) >= 5: break
@@ -211,5 +200,8 @@ def get_all_users():
         all_data.append(scrape_summoner(url))
     return jsonify(all_data)
 
+# --- ANA ÇALIŞTIRMA ---
 if __name__ == '__main__':
+    # Sunucu kalkarken fiyatları çek
+    load_item_prices()
     app.run(host='0.0.0.0', port=5000)
