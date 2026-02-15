@@ -9,7 +9,6 @@ import random
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# Takip edilecek hesaplar
 URL_LISTESI = [
     "https://www.leagueofgraphs.com/summoner/tr/Ragnar+Lothbrok-0138",
     "https://www.leagueofgraphs.com/summoner/tr/D%C3%96L+VE+OKS%C4%B0JEN-011"
@@ -26,17 +25,6 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
-# --- LİG GÖRSELİ ---
-def get_rank_icon_url(rank_text):
-    base_url = "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-{tier}.png"
-    if not rank_text or "Unranked" in rank_text: return base_url.format(tier="unranked")
-    
-    tier = rank_text.split()[0].lower()
-    valid_tiers = ["iron", "bronze", "silver", "gold", "platinum", "emerald", "diamond", "master", "grandmaster", "challenger"]
-    
-    if tier in valid_tiers: return base_url.format(tier=tier)
-    return base_url.format(tier="unranked")
-
 # --- NOT HESAPLAMA ---
 def calculate_grade(score):
     if score >= 4.0: return "S"
@@ -46,56 +34,61 @@ def calculate_grade(score):
     elif score >= 1.0: return "D"
     else: return "F"
 
-# --- SCRAPER (VERİ ÇEKİCİ) ---
+# --- SÜRE ÇEVİRİCİ ---
+def parse_duration_to_seconds(time_str):
+    try:
+        parts = time_str.split(':')
+        if len(parts) == 2: return int(parts[0]) * 60 + int(parts[1])
+        elif len(parts) == 3: return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    except: return 1800
+    return 0
+
+# --- ALTIN HESAPLAMA (Matematiksel) ---
+def calculate_gold_math(kills, assists, cs, duration_seconds):
+    gold = 500 
+    gold += (cs * 21)
+    gold += (kills * 300)
+    gold += (assists * 150)
+    if duration_seconds > 65:
+        gold += (duration_seconds - 65) * 2.04
+    return f"{round(gold / 1000, 1)}k"
+
+# --- SCRAPER ---
 def scrape_summoner(url):
-    print(f"--> İşleniyor: {url}...") # Konsol Logu
-    time.sleep(random.uniform(0.2, 0.5)) # Kısa bekleme
-    
+    time.sleep(random.uniform(0.3, 0.8))
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9"
     }
     
     try:
-        # Timeout süresini 10 saniyeye düşürdük, donmasın diye
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code != 200:
-            print(f"HATA: Siteye ulaşılamadı ({response.status_code})")
-            return {"error": "Erişim Hatası", "summoner": "Hata", "matches": []}
-
+        response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # İsim
         summoner_name = "Sihirdar"
         try: summoner_name = soup.find("title").text.split("(")[0].strip().replace(" - League of Legends", "")
         except: pass
 
-        # Rank
         rank_text = "Unranked"
         try:
             banner = soup.find("div", class_="bannerSubtitle")
             rank_text = banner.text.strip() if banner else soup.find("div", class_="league-tier").text.strip()
         except: pass
-        
-        rank_image_url = get_rank_icon_url(rank_text)
 
-        # İkon
         profile_icon = f"{RIOT_CDN}/profileicon/29.png"
         try:
             img = soup.find("div", class_="img").find("img")
             if img: profile_icon = "https:" + img.get("src")
         except: pass
 
-        # MAÇLAR
         matches_info = []
         all_rows = soup.find_all("tr")
         
         for row in all_rows:
             try:
-                # KDA Kutusu yoksa maç satırı değildir, geç
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
@@ -119,7 +112,7 @@ def scrape_summoner(url):
                             break
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İtemler
+                # 2. İtemler (Sadece Dolu Olanlar)
                 items = []
                 for img in row.find_all("img"):
                     img_str = str(img)
@@ -129,9 +122,9 @@ def scrape_summoner(url):
                         val = int(num)
                         if 1000 <= val <= 8000 and not (5000 <= val < 6000) and not (2020 <= val <= 2030):
                             items.append(f"{RIOT_CDN}/item/{val}.png")
-                clean_items = list(dict.fromkeys(items))[:9]
+                clean_items = list(dict.fromkeys(items))[:9] # Tekrar edenleri sil
 
-                # 3. KDA & Sonuç
+                # 3. Veriler
                 row_text = row.text.strip()
                 kda_text = kda_div.text.strip()
                 result = "win" if "Victory" in row.text or "Zafer" in row.text else "lose"
@@ -139,6 +132,7 @@ def scrape_summoner(url):
                 nums = re.findall(r"(\d+)", kda_text)
                 kda_display = "Perfect"
                 score_val = 99.0
+                k, d, a = 0, 0, 0
                 if len(nums) >= 3:
                     k, d, a = int(nums[0]), int(nums[1]), int(nums[2])
                     if d > 0:
@@ -148,10 +142,9 @@ def scrape_summoner(url):
                 else:
                     kda_display = "-"
                     score_val = 0.0
-                
                 grade = calculate_grade(score_val)
 
-                # 4. CS (Minyon) - Güçlendirilmiş
+                # 4. CS (Minyon)
                 cs_val = 0
                 cs_div = row.find("div", class_="minions")
                 if cs_div:
@@ -162,23 +155,38 @@ def scrape_summoner(url):
                     if m: cs_val = int(m.group(1))
                 cs_stat = f"{cs_val} CS"
 
-                # 5. Oyun Türü & LP (YENİ)
+                # 5. Oyun Türü (GÜÇLENDİRİLMİŞ TARAMA)
                 queue_mode = "Normal"
+                
+                # A) Sütun Başlığına Bak (En yaygın yer)
                 q_div = row.find("div", class_="queueType")
                 if q_div:
                     raw_q = q_div.text.strip()
                     if "Ranked Solo" in raw_q: queue_mode = "Solo/Duo"
                     elif "Ranked Flex" in raw_q: queue_mode = "Flex"
                     elif "ARAM" in raw_q: queue_mode = "ARAM"
-                    elif "Arena" in raw_q: queue_mode = "Arena"
-                    else: 
-                        parts = raw_q.split()
-                        queue_mode = parts[0] if parts else "Normal"
+                    else: queue_mode = raw_q.split()[0]
+                else:
+                    # B) Metin Taraması (Yedek Plan)
+                    if "Ranked Solo" in row_text: queue_mode = "Solo/Duo"
+                    elif "Ranked Flex" in row_text: queue_mode = "Flex"
+                    elif "ARAM" in row_text: queue_mode = "ARAM"
 
+                # 6. Altın Hesabı
+                duration_sec = 0
+                dur_div = row.find("div", class_="gameDuration")
+                if dur_div: duration_sec = parse_duration_to_seconds(dur_div.text.strip())
+                else:
+                     m = re.search(r"(\d{1,2}:\d{2})", row_text)
+                     if m: duration_sec = parse_duration_to_seconds(m.group(1))
+                     else: duration_sec = 1500
+
+                gold_stat = calculate_gold_math(k, a, cs_val, duration_sec)
+                
+                # LP Bilgisi (Yedek)
                 lp_text = ""
                 lp_match = re.search(r"([+-]\d+)\s*LP", row_text)
-                if lp_match:
-                    lp_text = f"{lp_match.group(1)} LP"
+                if lp_match: lp_text = f"{lp_match.group(1)} LP"
 
                 matches_info.append({
                     "champion": champ_key,
@@ -188,31 +196,26 @@ def scrape_summoner(url):
                     "items": clean_items,
                     "grade": grade,
                     "cs": cs_stat,
-                    "rank_img": rank_image_url,
-                    "queue_mode": queue_mode,
+                    "gold": gold_stat, # Altın geri geldi
+                    "queue_mode": queue_mode, # Oyun türü (Solo/Flex)
                     "lp_change": lp_text,
                     "kda_score": kda_display
                 })
                 if len(matches_info) >= 5: break
             except: continue
         
-        print(f"   --> {summoner_name} verisi hazır.")
         return {"summoner": summoner_name, "rank": rank_text, "icon": profile_icon, "matches": matches_info}
 
     except Exception as e:
-        print(f"HATA: {e}")
         return {"error": str(e), "summoner": "Hata", "matches": []}
 
 @app.route('/api/get-ragnar', methods=['GET'])
 def get_all_users():
     all_data = []
-    print("\n--- API İSTEĞİ GELDİ ---")
+    print("Veriler çekiliyor...")
     for url in URL_LISTESI:
-        data = scrape_summoner(url)
-        all_data.append(data)
-    print("--- YANIT GÖNDERİLİYOR ---\n")
+        all_data.append(scrape_summoner(url))
     return jsonify(all_data)
 
 if __name__ == '__main__':
-    print("Sunucu Başlatılıyor... http://localhost:5000 adresine gidin.")
     app.run(host='0.0.0.0', port=5000)
