@@ -3,26 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ABT Takip Sistemi</title>
+    <title>LoL Canlı Takip</title>
+    
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Eğer style.css yüklenmezse diye yedek basit stiller */
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #aaa;
+            font-size: 1.2rem;
+        }
+        h1.main-title {
+            text-align: center;
+            color: #d1d8e0;
+            margin-bottom: 30px;
+            letter-spacing: 1px;
+        }
+    </style>
 </head>
 <body>
 
-    <div class="overlay"></div>
-
     <div class="container">
-        <header>
-            <h1>ABT BUILDS</h1>
-            <p style="color: #aaa;">Canlı Maç Takip Sistemi</p>
-        </header>
-
+        <h1 class="main-title">CANLI MAÇ TAKİP SİSTEMİ</h1>
+        
         <div id="profiles-area">
-            <p style="text-align:center; color:#ddd;">Veriler Yükleniyor...</p>
+            <div class="loading">Sistem Başlatılıyor...</div>
         </div>
-
     </div>
 
     <script src="script.js"></script>
+
 </body>
 </html>
