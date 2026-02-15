@@ -36,23 +36,18 @@ def calculate_grade(score):
 
 # --- SCRAPER ---
 def scrape_summoner(url):
-    print(f"Bağlanılıyor: {url}...")
-    time.sleep(random.uniform(0.5, 1.5))
+    # Bot koruması için bekleme ve İngilizce Header (QueueType'ı garanti yakalamak için)
+    time.sleep(random.uniform(0.3, 0.8))
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.google.com/"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
     }
     
     try:
         response = requests.get(url, headers=headers, timeout=15)
-        if response.status_code != 200:
-            return {"error": f"Bağlantı Hatası ({response.status_code})", "summoner": "Veri Yok", "matches": []}
-
         soup = BeautifulSoup(response.content, 'html.parser')
 
         # İsim ve Rank
@@ -80,24 +75,34 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # --- 1. OYUN TÜRÜ ---
+                # --- 1. OYUN TÜRÜ (SENİN KODUNDAKİ ÇALIŞAN MANTIK) ---
                 queue_mode = "Normal"
-                row_text_full = row.text.strip()
-                row_text_lower = row_text_full.lower()
-
-                if "ranked solo" in row_text_lower: queue_mode = "Solo/Duo"
-                elif "ranked flex" in row_text_lower: queue_mode = "Flex"
-                elif "aram" in row_text_lower: queue_mode = "ARAM"
-                elif "clash" in row_text_lower: queue_mode = "Clash"
-                elif "arena" in row_text_lower: queue_mode = "Arena"
-                else:
-                    q_div = row.find("div", class_="queueType")
-                    if q_div:
-                        q_text = q_div.text.strip().lower()
-                        if "solo" in q_text: queue_mode = "Solo/Duo"
-                        elif "flex" in q_text: queue_mode = "Flex"
                 
-                # --- 2. ŞAMPİYON ---
+                # A) Direkt QueueType Div'i
+                q_div = row.find("div", class_="queueType")
+                if q_div:
+                    raw_q = q_div.text.strip()
+                    if "Ranked Solo" in raw_q: queue_mode = "Solo/Duo"
+                    elif "Ranked Flex" in raw_q: queue_mode = "Flex"
+                    elif "ARAM" in raw_q: queue_mode = "ARAM"
+                    elif "Arena" in raw_q: queue_mode = "Arena"
+                    else: queue_mode = raw_q.split()[0]
+                else:
+                    # B) GameMode Div'i (Bazı sayfalarda buradadır)
+                    g_div = row.find("div", class_="gameMode")
+                    if g_div:
+                        raw_g = g_div.text.strip()
+                        if "Solo" in raw_g: queue_mode = "Solo/Duo"
+                        elif "Flex" in raw_g: queue_mode = "Flex"
+                        else: queue_mode = raw_g
+                    else:
+                        # C) Metin Taraması (Son Çare)
+                        row_text = row.text.strip()
+                        if "Ranked Solo" in row_text: queue_mode = "Solo/Duo"
+                        elif "Ranked Flex" in row_text: queue_mode = "Flex"
+                        elif "ARAM" in row_text: queue_mode = "ARAM"
+
+                # --- 2. ŞAMPİYON BULMA ---
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -117,7 +122,8 @@ def scrape_summoner(url):
                             break
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # --- 3. İTEMLER ---
+                # --- 3. İTEMLER (BENİM KODUMDAKİ ÇALIŞAN MANTIK) ---
+                # src yerine str(img) kullanarak her türlü ID'yi yakalar
                 items = []
                 img_tags = row.find_all("img")
                 for img in img_tags:
@@ -132,9 +138,9 @@ def scrape_summoner(url):
                             items.append(f"{RIOT_CDN}/item/{val}.png")
                 clean_items = list(dict.fromkeys(items))[:9]
 
-                # --- 4. VERİLER ---
+                # --- 4. TEMEL VERİLER ---
                 kda_text = kda_div.text.strip()
-                result = "win" if "Victory" in row_text_full or "Zafer" in row_text_full else "lose"
+                result = "win" if "Victory" in row.text or "Zafer" in row.text else "lose"
 
                 nums = re.findall(r"(\d+)", kda_text)
                 kda_display = "Perfect"
@@ -154,30 +160,29 @@ def scrape_summoner(url):
                     m = re.search(r"(\d+)", cs_div.text)
                     if m: cs_val = int(m.group(1))
                 else:
-                    m = re.search(r"(\d+)\s*CS", row_text_full, re.IGNORECASE)
+                    m = re.search(r"(\d+)\s*CS", row.text, re.IGNORECASE)
                     if m: cs_val = int(m.group(1))
                 
-                # EŞİK: 70 CS
-                display_stat = f"{cs_val} CS" # Varsayılan: Minyon Skoru
-                
+                # EŞİK KONTROLÜ: 70
+                # Varsayılan metin
+                cs_stat = f"{cs_val} CS"
+
                 if cs_val < 70:
-                    # Destek oyuncusu olma ihtimali yüksek.
-                    # League of Graphs'ta "Vision Score" her zaman açıkça yazmaz.
-                    # Ancak "Wards" (Totem) sayısı veya "Control Wards" (Kontrol Totemi) genelde yazar.
-                    # Biz burada güvenli bir yöntemle "Sup" yazdırabiliriz veya bulabilirsek Totem sayısını.
+                    # Minyon sayısı 70'in altındaysa Vision Score (veya Totem) ara
+                    ward_score = "0"
                     
-                    ward_found = False
-                    # Tüm metin içinde "Vision Score: 35" gibi bir şey arayalım (Zor ama deneyelim)
-                    # Veya basitçe "Sup" yazalım, çünkü 0 CS yazmasından iyidir.
+                    # Totem sayısını bulmaya çalış (League of Graphs'ta "wards" div'i içinde olabilir)
+                    wards_div = row.find("div", class_="wards")
+                    if wards_div:
+                        wm = re.search(r"(\d+)", wards_div.text)
+                        if wm: ward_score = wm.group(1)
                     
-                    display_stat = "Sup" # Varsayılan Support Yazısı
-                    
-                    # Eğer totem sayısı bulunabilirse onu yaz
-                    # (League of Graphs HTML yapısında bu bazen gizlidir)
+                    # Ekrana basılacak metni değiştir: "75 VS"
+                    cs_stat = f"{ward_score} VS"
 
                 # LP
                 lp_text = ""
-                lp_match = re.search(r"([+-]\d+)\s*LP", row_text_full)
+                lp_match = re.search(r"([+-]\d+)\s*LP", row.text)
                 if lp_match: lp_text = f"{lp_match.group(1)} LP"
 
                 matches_info.append({
@@ -187,8 +192,8 @@ def scrape_summoner(url):
                     "img": final_champ_img,
                     "items": clean_items,
                     "grade": grade,
-                    "cs": display_stat, # 70 altıysa "Sup", üstüyse "145 CS"
-                    "queue_mode": queue_mode,
+                    "cs": cs_stat, # Artık burası "145 CS" veya "25 VS" olabilir
+                    "queue_mode": queue_mode, # Çalışan SoloQ mantığı
                     "lp_change": lp_text,
                     "kda_score": kda_display
                 })
