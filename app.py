@@ -34,25 +34,6 @@ def calculate_grade(score):
     elif score >= 1.0: return "D"
     else: return "F"
 
-# --- SÜRE ÇEVİRİCİ ---
-def parse_duration_to_seconds(time_str):
-    try:
-        parts = time_str.split(':')
-        if len(parts) == 2: return int(parts[0]) * 60 + int(parts[1])
-        elif len(parts) == 3: return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-    except: return 1800
-    return 0
-
-# --- ALTIN HESAPLAMA (Matematiksel) ---
-def calculate_gold_math(kills, assists, cs, duration_seconds):
-    gold = 500 
-    gold += (cs * 21)
-    gold += (kills * 300)
-    gold += (assists * 150)
-    if duration_seconds > 65:
-        gold += (duration_seconds - 65) * 2.04
-    return f"{round(gold / 1000, 1)}k"
-
 # --- SCRAPER ---
 def scrape_summoner(url):
     time.sleep(random.uniform(0.3, 0.8))
@@ -68,16 +49,19 @@ def scrape_summoner(url):
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
+        # İsim
         summoner_name = "Sihirdar"
         try: summoner_name = soup.find("title").text.split("(")[0].strip().replace(" - League of Legends", "")
         except: pass
 
+        # Rank
         rank_text = "Unranked"
         try:
             banner = soup.find("div", class_="bannerSubtitle")
             rank_text = banner.text.strip() if banner else soup.find("div", class_="league-tier").text.strip()
         except: pass
 
+        # Profil Resmi
         profile_icon = f"{RIOT_CDN}/profileicon/29.png"
         try:
             img = soup.find("div", class_="img").find("img")
@@ -112,17 +96,29 @@ def scrape_summoner(url):
                             break
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # 2. İtemler (Sadece Dolu Olanlar)
+                # 2. İtemler (Daha Güvenli Tarama)
                 items = []
-                for img in row.find_all("img"):
-                    img_str = str(img)
-                    if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str: continue
-                    candidates = re.findall(r"(\d{4})", img_str)
-                    for num in candidates:
-                        val = int(num)
-                        if 1000 <= val <= 8000 and not (5000 <= val < 6000) and not (2020 <= val <= 2030):
+                # Satırın içindeki tüm resimleri al
+                all_imgs = row.find_all("img")
+                for img in all_imgs:
+                    src = img.get("src", "")
+                    # İtem ID'si 4 haneli sayı olur (örn: 1055.png)
+                    # Ancak şampiyon, spell veya rün resimlerini filtrele
+                    if any(x in src for x in ["champion", "spell", "perk", "tier"]): continue
+                    
+                    m = re.search(r"/(\d{4})\.png", src) # Sadece /1234.png formatını ara
+                    if not m: 
+                        m = re.search(r"item/(\d{4})", src) # Yedek: item/1234 ara
+
+                    if m:
+                        val = int(m.group(1))
+                        # İtem ID aralığı (Çöp resimleri alma)
+                        if 1000 <= val <= 8000: 
+                            if 5000 <= val < 6000: continue
+                            if 2020 <= val <= 2030: continue
                             items.append(f"{RIOT_CDN}/item/{val}.png")
-                clean_items = list(dict.fromkeys(items))[:9] # Tekrar edenleri sil
+
+                clean_items = list(dict.fromkeys(items))[:7] # En fazla 7 item
 
                 # 3. Veriler
                 row_text = row.text.strip()
@@ -132,7 +128,6 @@ def scrape_summoner(url):
                 nums = re.findall(r"(\d+)", kda_text)
                 kda_display = "Perfect"
                 score_val = 99.0
-                k, d, a = 0, 0, 0
                 if len(nums) >= 3:
                     k, d, a = int(nums[0]), int(nums[1]), int(nums[2])
                     if d > 0:
@@ -144,7 +139,7 @@ def scrape_summoner(url):
                     score_val = 0.0
                 grade = calculate_grade(score_val)
 
-                # 4. CS (Minyon)
+                # CS
                 cs_val = 0
                 cs_div = row.find("div", class_="minions")
                 if cs_div:
@@ -155,35 +150,32 @@ def scrape_summoner(url):
                     if m: cs_val = int(m.group(1))
                 cs_stat = f"{cs_val} CS"
 
-                # 5. Oyun Türü (GÜÇLENDİRİLMİŞ TARAMA)
+                # 4. Oyun Türü (GÜÇLENDİRİLMİŞ)
                 queue_mode = "Normal"
                 
-                # A) Sütun Başlığına Bak (En yaygın yer)
+                # A) Direkt QueueType Div'i
                 q_div = row.find("div", class_="queueType")
                 if q_div:
                     raw_q = q_div.text.strip()
                     if "Ranked Solo" in raw_q: queue_mode = "Solo/Duo"
                     elif "Ranked Flex" in raw_q: queue_mode = "Flex"
                     elif "ARAM" in raw_q: queue_mode = "ARAM"
+                    elif "Arena" in raw_q: queue_mode = "Arena"
                     else: queue_mode = raw_q.split()[0]
                 else:
-                    # B) Metin Taraması (Yedek Plan)
-                    if "Ranked Solo" in row_text: queue_mode = "Solo/Duo"
-                    elif "Ranked Flex" in row_text: queue_mode = "Flex"
-                    elif "ARAM" in row_text: queue_mode = "ARAM"
+                    # B) GameMode Div'i (Bazı sayfalarda buradadır)
+                    g_div = row.find("div", class_="gameMode")
+                    if g_div:
+                        raw_g = g_div.text.strip()
+                        if "Solo" in raw_g: queue_mode = "Solo/Duo"
+                        elif "Flex" in raw_g: queue_mode = "Flex"
+                        else: queue_mode = raw_g
+                    else:
+                        # C) Metin Taraması (Son Çare)
+                        if "Ranked Solo" in row_text: queue_mode = "Solo/Duo"
+                        elif "Ranked Flex" in row_text: queue_mode = "Flex"
 
-                # 6. Altın Hesabı
-                duration_sec = 0
-                dur_div = row.find("div", class_="gameDuration")
-                if dur_div: duration_sec = parse_duration_to_seconds(dur_div.text.strip())
-                else:
-                     m = re.search(r"(\d{1,2}:\d{2})", row_text)
-                     if m: duration_sec = parse_duration_to_seconds(m.group(1))
-                     else: duration_sec = 1500
-
-                gold_stat = calculate_gold_math(k, a, cs_val, duration_sec)
-                
-                # LP Bilgisi (Yedek)
+                # 5. LP (Eğer varsa)
                 lp_text = ""
                 lp_match = re.search(r"([+-]\d+)\s*LP", row_text)
                 if lp_match: lp_text = f"{lp_match.group(1)} LP"
@@ -196,8 +188,7 @@ def scrape_summoner(url):
                     "items": clean_items,
                     "grade": grade,
                     "cs": cs_stat,
-                    "gold": gold_stat, # Altın geri geldi
-                    "queue_mode": queue_mode, # Oyun türü (Solo/Flex)
+                    "queue_mode": queue_mode,
                     "lp_change": lp_text,
                     "kda_score": kda_display
                 })
