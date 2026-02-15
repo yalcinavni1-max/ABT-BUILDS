@@ -34,17 +34,15 @@ def calculate_grade(score):
     elif score >= 1.0: return "D"
     else: return "F"
 
-# --- SCRAPER (SENİN ÇALIŞAN ORİJİNAL KODUN) ---
+# --- SCRAPER ---
 def scrape_summoner(url):
-    # Bot koruması
     time.sleep(random.uniform(0.3, 0.8))
-    
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9"
+        "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7" # Türkçe öncelikli
     }
     
     try:
@@ -76,7 +74,32 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # --- 1. ŞAMPİYON BULMA (ORİJİNAL SAĞLAM KOD) ---
+                # --- 1. OYUN TÜRÜNÜ BUL (GÜÇLENDİRİLMİŞ) ---
+                queue_mode = "Normal"
+                
+                # A) Metin Taraması (Tüm Varyasyonlar)
+                row_text = row.text.strip().lower() # Küçük harfe çevirip ara
+                
+                if "tek/çift" in row_text or "solo" in row_text: queue_mode = "Solo/Duo"
+                elif "esnek" in row_text or "flex" in row_text: queue_mode = "Flex"
+                elif "aram" in row_text: queue_mode = "ARAM"
+                elif "arena" in row_text: queue_mode = "Arena"
+                elif "clash" in row_text: queue_mode = "Clash"
+                
+                # B) QueueType Div Kontrolü (Yedek)
+                if queue_mode == "Normal":
+                    q_div = row.find("div", class_="queueType")
+                    if q_div:
+                        raw_q = q_div.text.strip().lower()
+                        if "solo" in raw_q: queue_mode = "Solo/Duo"
+                        elif "flex" in raw_q: queue_mode = "Flex"
+                
+                # --- SADECE DERECELİ MAÇLARI AL ---
+                # Eğer Solo/Duo veya Flex değilse, bu maçı geç.
+                if queue_mode not in ["Solo/Duo", "Flex"]:
+                    continue
+
+                # --- 2. ŞAMPİYON BULMA ---
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -88,18 +111,15 @@ def scrape_summoner(url):
                             name_map = {"wukong": "MonkeyKing", "renata": "Renata", "missfortune": "MissFortune", "masteryi": "MasterYi", "drmundo": "DrMundo", "jarvaniv": "JarvanIV", "tahmkench": "TahmKench", "xinzhao": "XinZhao", "kogmaw": "KogMaw", "reksai": "RekSai", "aurelionsol": "AurelionSol", "twistedfate": "TwistedFate", "leesin": "LeeSin", "kaisa": "Kaisa"}
                             champ_key = name_map.get(raw, raw.capitalize())
                             break
-                # Yedek Poro Kontrolü
                 if champ_key == "Poro":
-                    imgs = row.find_all("img")
-                    for img in imgs:
+                    for img in row.find_all("img"):
                         alt = img.get("alt", "")
                         if alt and len(alt) > 2 and alt not in ["Victory", "Defeat", "Role", "Item", "Gold"]:
                             champ_key = alt.replace(" ", "").replace("'", "").replace(".", "")
                             break
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # --- 2. İTEMLER (ORİJİNAL SAĞLAM KOD) ---
-                # "Itemleri geri getirelim" dediğin kısım burası. Bu kod itemleri kaçırmaz.
+                # --- 3. İTEMLER ---
                 items = []
                 img_tags = row.find_all("img")
                 for img in img_tags:
@@ -114,8 +134,7 @@ def scrape_summoner(url):
                             items.append(f"{RIOT_CDN}/item/{val}.png")
                 clean_items = list(dict.fromkeys(items))[:9]
 
-                # --- 3. TEMEL VERİLER ---
-                row_text = row.text.strip()
+                # --- 4. VERİLER ---
                 kda_text = kda_div.text.strip()
                 result = "win" if "Victory" in row.text or "Zafer" in row.text else "lose"
 
@@ -128,42 +147,23 @@ def scrape_summoner(url):
                         score_val = (k + a) / d
                         kda_display = "{:.2f}".format(score_val)
                     else: score_val = 99.0
-                else:
-                    kda_display = "-"
-                    score_val = 0.0
                 grade = calculate_grade(score_val)
 
-                # CS (Minyon)
+                # CS
                 cs_val = 0
                 cs_div = row.find("div", class_="minions")
                 if cs_div:
                     m = re.search(r"(\d+)", cs_div.text)
                     if m: cs_val = int(m.group(1))
                 else:
-                    m = re.search(r"(\d+)\s*CS", row_text, re.IGNORECASE)
+                    m = re.search(r"(\d+)\s*CS", row.text, re.IGNORECASE)
                     if m: cs_val = int(m.group(1))
                 cs_stat = f"{cs_val} CS"
 
-                # --- 4. OYUN TÜRÜ (YENİ VE ÇALIŞAN ÖZELLİK) ---
-                queue_mode = "Normal"
-                q_div = row.find("div", class_="queueType")
-                if q_div:
-                    raw_q = q_div.text.strip()
-                    if "Ranked Solo" in raw_q: queue_mode = "Solo/Duo"
-                    elif "Ranked Flex" in raw_q: queue_mode = "Flex"
-                    elif "ARAM" in raw_q: queue_mode = "ARAM"
-                    elif "Arena" in raw_q: queue_mode = "Arena"
-                    else: queue_mode = raw_q.split()[0]
-                else:
-                    # Yedek kontrol
-                    if "Ranked Solo" in row_text: queue_mode = "Solo/Duo"
-                    elif "Ranked Flex" in row_text: queue_mode = "Flex"
-
-                # --- 5. LP BİLGİSİ (YENİ) ---
+                # LP
                 lp_text = ""
-                lp_match = re.search(r"([+-]\d+)\s*LP", row_text)
-                if lp_match:
-                    lp_text = f"{lp_match.group(1)} LP"
+                lp_match = re.search(r"([+-]\d+)\s*LP", row.text)
+                if lp_match: lp_text = f"{lp_match.group(1)} LP"
 
                 matches_info.append({
                     "champion": champ_key,
@@ -173,8 +173,8 @@ def scrape_summoner(url):
                     "items": clean_items,
                     "grade": grade,
                     "cs": cs_stat,
-                    "queue_mode": queue_mode, # Solo/Duo Bilgisi
-                    "lp_change": lp_text,     # LP Bilgisi
+                    "queue_mode": queue_mode,
+                    "lp_change": lp_text,
                     "kda_score": kda_display
                 })
                 if len(matches_info) >= 5: break
