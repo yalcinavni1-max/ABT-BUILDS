@@ -151,18 +151,24 @@ def scrape_summoner(url):
                     if cs_match: cs_val = int(cs_match.group(1))
                 cs_stat = f"{cs_val} CS"
 
-                # --- OYUN TÜRÜNÜ BELİRLE (YENİ) ---
+                # --- OYUN TÜRÜ (Solo/Flex) ---
                 queue_mode = "Normal"
                 q_div = row.find("div", class_="queueType")
                 if q_div:
                     raw_q = q_div.text.strip()
-                    # Metni güzelleştir
                     if "Ranked Solo" in raw_q: queue_mode = "Solo/Duo"
                     elif "Ranked Flex" in raw_q: queue_mode = "Flex"
                     elif "ARAM" in raw_q: queue_mode = "ARAM"
                     elif "Clash" in raw_q: queue_mode = "Clash"
                     elif "Arena" in raw_q: queue_mode = "Arena"
-                    else: queue_mode = raw_q.split()[0] # Çok uzunsa ilk kelimeyi al
+                    else: queue_mode = raw_q.split()[0]
+
+                # --- LP KAZANCI (YENİ EKLENDİ) ---
+                lp_text = ""
+                # "+15 LP" formatını ara
+                lp_match = re.search(r"([+-]\d+)\s*LP", row_text)
+                if lp_match:
+                    lp_text = f"{lp_match.group(1)} LP"
 
                 matches_info.append({
                     "champion": champ_key,
@@ -173,7 +179,8 @@ def scrape_summoner(url):
                     "grade": grade,
                     "cs": cs_stat,
                     "rank_img": rank_image_url,
-                    "queue_mode": queue_mode, # YENİ VERİ
+                    "queue_mode": queue_mode,
+                    "lp_change": lp_text, # LP bilgisi buraya eklendi
                     "kda_score": kda_display
                 })
                 if len(matches_info) >= 5: break
