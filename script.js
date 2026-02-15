@@ -75,9 +75,9 @@ function createProfileCard(user) {
                         <span class="detail-label">Minyon</span>
                         <span class="detail-val text-gray">${match.cs}</span>
                     </div>
-                    <div class="detail-box">
-                        <span class="detail-label">Altın</span>
-                        <span class="detail-val text-gold">💰${match.gold}</span>
+                    <div class="detail-box" style="display: flex; flex-direction: column; align-items: center;">
+                        <span class="detail-label" style="margin-bottom: 2px;">Lig</span>
+                        <img src="${match.rank_img}" style="width: 35px; height: 35px; object-fit: contain;">
                     </div>
                 </div>
             `;
