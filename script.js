@@ -50,22 +50,18 @@ function createProfileCard(user) {
             card.classList.add('match-card', resClass);
             card.onclick = () => card.classList.toggle('active');
 
-            // --- İTEMLERİ GERİ GETİRME ---
+            // İtemler (Boşlar gizli)
             let itemsHtml = '';
             const items = match.items || [];
             if (items.length > 0) {
                 items.forEach(url => {
                     itemsHtml += `<div class="item-slot"><img src="${url}" class="item-img" onerror="this.parentElement.style.display='none'"></div>`;
                 });
-                // Boş slotlar görünmesin istersen bu döngüyü sil, görünsün istersen kalsın
-                // (İsteğin üzerine sadece dolu olanları gösteriyoruz)
             } else {
                 itemsHtml = '<span style="font-size:0.7rem; color:#666;">İtem Yok</span>';
             }
 
             const champImg = match.img || "";
-            
-            // LP Rengi ve Stili
             const lpText = match.lp_change || "";
             let lpStyle = "color:#aaa;";
             if(lpText.includes('+')) lpStyle = "color:#4cd137;";
@@ -109,7 +105,7 @@ function createProfileCard(user) {
             container.appendChild(card);
         });
     } else {
-        container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">Maç bulunamadı.</div>';
+        container.innerHTML = '<div style="padding:20px; text-align:center; color:#888; font-style:italic;">Son maçlarda Dereceli (Solo/Flex) bulunamadı.</div>';
     }
     profilesArea.appendChild(section);
 }
