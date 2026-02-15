@@ -53,10 +53,13 @@ function createProfileCard(user) {
             // İtemler (SADECE DOLU OLANLAR)
             let itemsHtml = '';
             const items = match.items || [];
-            items.forEach(url => {
-                itemsHtml += `<div class="item-slot"><img src="${url}" class="item-img"></div>`;
-            });
-            // Boş slot döngüsü SİLİNDİ.
+            if (items.length > 0) {
+                items.forEach(url => {
+                    itemsHtml += `<div class="item-slot"><img src="${url}" class="item-img" onerror="this.parentElement.style.display='none'"></div>`;
+                });
+            } else {
+                itemsHtml = '<span style="font-size:0.7rem; color:#666;">İtem Yok</span>';
+            }
 
             const champImg = match.img || "";
             
@@ -98,7 +101,6 @@ function createProfileCard(user) {
                     <div class="detail-box" style="flex-direction:column;">
                         <span style="font-size:0.75rem; color:#ddd; font-weight:bold;">${match.queue_mode}</span>
                         <span style="font-size:0.7rem; font-weight:bold; ${lpStyle} margin-top:2px;">${lpText}</span>
-                        ${!lpText ? `<span style="font-size:0.7rem; color:gold;">💰${match.gold}</span>` : ''}
                     </div>
                 </div>
             `;
