@@ -36,43 +36,31 @@ def calculate_grade(score):
 
 # --- SCRAPER ---
 def scrape_summoner(url):
-    print(f"Bağlanılıyor: {url}...")
-    time.sleep(random.uniform(0.5, 1.5)) # Engel yememek için biraz bekle
+    # Bot koruması için bekleme ve İngilizce Header (QueueType'ı garanti yakalamak için)
+    time.sleep(random.uniform(0.3, 0.8))
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
-    # GERÇEK TARAYICI GİBİ GÖRÜNME (Kamuflaj)
-    # Dili İngilizce (en-US) istiyoruz ki "Ranked Solo" yazısı kesin gelsin.
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.google.com/"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
     }
     
     try:
-        # Timeout 15sn: Site cevap vermezse bekleme, devam et.
         response = requests.get(url, headers=headers, timeout=15)
-        
-        if response.status_code != 200:
-            print(f"HATA: Site engelledi veya kapalı. Kod: {response.status_code}")
-            return {"error": f"Bağlantı Hatası ({response.status_code})", "summoner": "Veri Yok", "matches": []}
-
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # İsim
+        # İsim ve Rank
         summoner_name = "Sihirdar"
         try: summoner_name = soup.find("title").text.split("(")[0].strip().replace(" - League of Legends", "")
         except: pass
 
-        # Rank
         rank_text = "Unranked"
         try:
             banner = soup.find("div", class_="bannerSubtitle")
             rank_text = banner.text.strip() if banner else soup.find("div", class_="league-tier").text.strip()
         except: pass
 
-        # İkon
         profile_icon = f"{RIOT_CDN}/profileicon/29.png"
         try:
             img = soup.find("div", class_="img").find("img")
@@ -87,28 +75,34 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # --- 1. OYUN TÜRÜ (Solo/Flex Tespiti) ---
+                # --- 1. OYUN TÜRÜ (SENİN KODUNDAKİ ÇALIŞAN MANTIK) ---
                 queue_mode = "Normal"
                 
-                # HTML içeriğini metin olarak al ve İngilizce anahtar kelimeleri ara
-                row_text_full = row.text.strip() # Büyük/Küçük harf duyarlı olabilir, o yüzden orijinali al
-                row_text_lower = row_text_full.lower()
-
-                # İngilizce (Headers ile zorladık)
-                if "ranked solo" in row_text_lower: queue_mode = "Solo/Duo"
-                elif "ranked flex" in row_text_lower: queue_mode = "Flex"
-                elif "aram" in row_text_lower: queue_mode = "ARAM"
-                elif "clash" in row_text_lower: queue_mode = "Clash"
-                elif "arena" in row_text_lower: queue_mode = "Arena"
+                # A) Direkt QueueType Div'i
+                q_div = row.find("div", class_="queueType")
+                if q_div:
+                    raw_q = q_div.text.strip()
+                    if "Ranked Solo" in raw_q: queue_mode = "Solo/Duo"
+                    elif "Ranked Flex" in raw_q: queue_mode = "Flex"
+                    elif "ARAM" in raw_q: queue_mode = "ARAM"
+                    elif "Arena" in raw_q: queue_mode = "Arena"
+                    else: queue_mode = raw_q.split()[0]
                 else:
-                    # Eğer hala bulunamadıysa QueueType divine bak
-                    q_div = row.find("div", class_="queueType")
-                    if q_div:
-                        q_text = q_div.text.strip().lower()
-                        if "solo" in q_text: queue_mode = "Solo/Duo"
-                        elif "flex" in q_text: queue_mode = "Flex"
-                
-                # --- 2. ŞAMPİYON ---
+                    # B) GameMode Div'i (Bazı sayfalarda buradadır)
+                    g_div = row.find("div", class_="gameMode")
+                    if g_div:
+                        raw_g = g_div.text.strip()
+                        if "Solo" in raw_g: queue_mode = "Solo/Duo"
+                        elif "Flex" in raw_g: queue_mode = "Flex"
+                        else: queue_mode = raw_g
+                    else:
+                        # C) Metin Taraması (Son Çare)
+                        row_text = row.text.strip()
+                        if "Ranked Solo" in row_text: queue_mode = "Solo/Duo"
+                        elif "Ranked Flex" in row_text: queue_mode = "Flex"
+                        elif "ARAM" in row_text: queue_mode = "ARAM"
+
+                # --- 2. ŞAMPİYON BULMA ---
                 champ_key = "Poro"
                 links = row.find_all("a")
                 for link in links:
@@ -128,24 +122,30 @@ def scrape_summoner(url):
                             break
                 final_champ_img = f"{RIOT_CDN}/champion/{champ_key}.png"
 
-                # --- 3. İTEMLER ---
+                # --- 3. İTEMLER (BENİM KODUMDAKİ ÇALIŞAN MANTIK) ---
+                # src yerine str(img) kullanarak her türlü ID'yi yakalar
                 items = []
                 img_tags = row.find_all("img")
                 for img in img_tags:
                     img_str = str(img)
+                    # Filtreler (Şampiyon, büyü, rün resimlerini alma)
                     if "champion" in img_str or "spell" in img_str or "tier" in img_str or "perk" in img_str: continue
+                    
+                    # 4 haneli sayıları bul (İtem ID'leri)
                     candidates = re.findall(r"(\d{4})", img_str)
                     for num in candidates:
                         val = int(num)
+                        # İtem ID Kontrolü (Aralık dışındakiler item değildir)
                         if 1000 <= val <= 8000:
-                            if 5000 <= val < 6000: continue
-                            if 2020 <= val <= 2030: continue
+                            if 5000 <= val < 6000: continue # Bazı özel mod itemleri
+                            if 2020 <= val <= 2030: continue # Totem vs.
                             items.append(f"{RIOT_CDN}/item/{val}.png")
-                clean_items = list(dict.fromkeys(items))[:9]
+                
+                clean_items = list(dict.fromkeys(items))[:7] # Tekrarları sil ve max 7 item al
 
-                # --- 4. VERİLER ---
+                # --- 4. TEMEL VERİLER ---
                 kda_text = kda_div.text.strip()
-                result = "win" if "Victory" in row_text_full or "Zafer" in row_text_full else "lose"
+                result = "win" if "Victory" in row.text or "Zafer" in row.text else "lose"
 
                 nums = re.findall(r"(\d+)", kda_text)
                 kda_display = "Perfect"
@@ -158,20 +158,20 @@ def scrape_summoner(url):
                     else: score_val = 99.0
                 grade = calculate_grade(score_val)
 
-                # CS
+                # CS (Minyon)
                 cs_val = 0
                 cs_div = row.find("div", class_="minions")
                 if cs_div:
                     m = re.search(r"(\d+)", cs_div.text)
                     if m: cs_val = int(m.group(1))
                 else:
-                    m = re.search(r"(\d+)\s*CS", row_text_full, re.IGNORECASE)
+                    m = re.search(r"(\d+)\s*CS", row.text, re.IGNORECASE)
                     if m: cs_val = int(m.group(1))
                 cs_stat = f"{cs_val} CS"
 
-                # LP (İngilizce Header olduğu için +15 LP yakalar)
+                # LP
                 lp_text = ""
-                lp_match = re.search(r"([+-]\d+)\s*LP", row_text_full)
+                lp_match = re.search(r"([+-]\d+)\s*LP", row.text)
                 if lp_match: lp_text = f"{lp_match.group(1)} LP"
 
                 matches_info.append({
@@ -182,18 +182,16 @@ def scrape_summoner(url):
                     "items": clean_items,
                     "grade": grade,
                     "cs": cs_stat,
-                    "queue_mode": queue_mode,
+                    "queue_mode": queue_mode, # Çalışan SoloQ mantığı
                     "lp_change": lp_text,
                     "kda_score": kda_display
                 })
                 if len(matches_info) >= 5: break
             except: continue
         
-        print(f"Başarılı: {summoner_name}")
         return {"summoner": summoner_name, "rank": rank_text, "icon": profile_icon, "matches": matches_info}
 
     except Exception as e:
-        print(f"Kritik Hata: {e}")
         return {"error": str(e), "summoner": "Hata", "matches": []}
 
 @app.route('/api/get-ragnar', methods=['GET'])
