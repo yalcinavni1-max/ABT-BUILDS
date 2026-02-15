@@ -25,6 +25,7 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
+# --- NOT HESAPLAMA ---
 def calculate_grade(score):
     if score >= 4.0: return "S"
     elif score >= 3.0: return "A"
@@ -33,20 +34,20 @@ def calculate_grade(score):
     elif score >= 1.0: return "D"
     else: return "F"
 
+# --- SCRAPER ---
 def scrape_summoner(url):
-    time.sleep(random.uniform(0.1, 0.4)) # Hızlandırıldı
+    time.sleep(random.uniform(0.2, 0.5))
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
-    # Dili İNGİLİZCE (en-US) zorluyoruz. Bu sayede "Ranked Solo" garantilenir.
+    # Dili İngilizceye sabitliyoruz ki terimler karışmasın
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=1.0" 
     }
     
     try:
-        # URL 'tr' olsa bile header ile İngilizce içerik isteyeceğiz
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
 
         summoner_name = "Sihirdar"
@@ -73,19 +74,24 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # --- 1. OYUN TÜRÜ (İNGİLİZCE TARAMA) ---
-                queue_mode = "Normal"
-                full_text = row.text.strip() # Tüm satır metni
+                # --- 1. OYUN TÜRÜNÜ DOĞRU TESPİT ET ---
+                queue_mode = "Normal" # Varsayılan
+                full_text = row.text.strip()
                 
-                # Header sayesinde artık Türkçe aramaya gerek yok.
-                # League of Graphs İngilizce terimleri: "Ranked Solo/Duo", "Ranked Flex"
-                
+                # Yöntem A: Sayfa içindeki metni tara (En garantisi)
                 if "Ranked Solo" in full_text: queue_mode = "Solo/Duo"
                 elif "Ranked Flex" in full_text: queue_mode = "Flex"
-                
-                # Eğer dereceli değilse bu maçı HİÇ alma, döngüyü atla
-                if queue_mode not in ["Solo/Duo", "Flex"]:
-                    continue
+                elif "ARAM" in full_text: queue_mode = "ARAM"
+                elif "Clash" in full_text: queue_mode = "Clash"
+                elif "Arena" in full_text: queue_mode = "Arena"
+                else:
+                    # Yöntem B: QueueType Div'i
+                    q_div = row.find("div", class_="queueType")
+                    if q_div:
+                        t = q_div.text.strip()
+                        if "Ranked Solo" in t: queue_mode = "Solo/Duo"
+                        elif "Ranked Flex" in t: queue_mode = "Flex"
+                        else: queue_mode = t.split()[0] # İlk kelimeyi al
 
                 # --- 2. ŞAMPİYON ---
                 champ_key = "Poro"
@@ -161,7 +167,7 @@ def scrape_summoner(url):
                     "items": clean_items,
                     "grade": grade,
                     "cs": cs_stat,
-                    "queue_mode": queue_mode,
+                    "queue_mode": queue_mode, # Artık doğru yazacak
                     "lp_change": lp_text,
                     "kda_score": kda_display
                 })
