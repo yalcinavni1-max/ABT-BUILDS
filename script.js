@@ -76,7 +76,7 @@ function createProfileCard(user) {
                         <span class="detail-val text-gray">${match.cs}</span>
                     </div>
                     <div class="detail-box" style="display: flex; flex-direction: column; align-items: center;">
-                        <span class="detail-label" style="margin-bottom: 2px;">Lig</span>
+                        <span class="detail-label" style="margin-bottom: 2px; font-size: 0.7rem; color: #aaa;">${match.queue_mode}</span>
                         <img src="${match.rank_img}" style="width: 35px; height: 35px; object-fit: contain;">
                     </div>
                 </div>
