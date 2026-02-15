@@ -25,7 +25,6 @@ def get_latest_version():
     except: pass
     return "14.3.1"
 
-# --- NOT HESAPLAMA ---
 def calculate_grade(score):
     if score >= 4.0: return "S"
     elif score >= 3.0: return "A"
@@ -34,16 +33,16 @@ def calculate_grade(score):
     elif score >= 1.0: return "D"
     else: return "F"
 
-# --- SCRAPER ---
 def scrape_summoner(url):
     time.sleep(random.uniform(0.2, 0.5))
     version = get_latest_version()
     RIOT_CDN = f"https://ddragon.leagueoflegends.com/cdn/{version}/img"
     
-    # Dili İngilizceye sabitliyoruz ki terimler karışmasın
+    # Header: Masaüstü Bilgisayar Gibi Davran (Mobile yönlendirmesin)
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=1.0" 
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.leagueofgraphs.com/"
     }
     
     try:
@@ -74,24 +73,22 @@ def scrape_summoner(url):
                 kda_div = row.find("div", class_="kda")
                 if not kda_div: continue
 
-                # --- 1. OYUN TÜRÜNÜ DOĞRU TESPİT ET ---
+                # --- 1. OYUN TÜRÜ (AVCI MODU) ---
+                # Div'e bakma, satırın tamamını string'e çevir ve içinde kelime ara.
+                row_str = str(row).lower() # Tüm HTML kodunu küçük harfe çevir
                 queue_mode = "Normal" # Varsayılan
-                full_text = row.text.strip()
                 
-                # Yöntem A: Sayfa içindeki metni tara (En garantisi)
-                if "Ranked Solo" in full_text: queue_mode = "Solo/Duo"
-                elif "Ranked Flex" in full_text: queue_mode = "Flex"
-                elif "ARAM" in full_text: queue_mode = "ARAM"
-                elif "Clash" in full_text: queue_mode = "Clash"
-                elif "Arena" in full_text: queue_mode = "Arena"
+                # Öncelik sırasına göre ara (Türkçe + İngilizce)
+                if "ranked solo" in row_str or "tek/çift" in row_str: queue_mode = "Solo/Duo"
+                elif "ranked flex" in row_str or "esnek" in row_str: queue_mode = "Flex"
+                elif "aram" in row_str: queue_mode = "ARAM"
+                elif "clash" in row_str: queue_mode = "Clash"
+                elif "arena" in row_str: queue_mode = "Arena"
                 else:
-                    # Yöntem B: QueueType Div'i
-                    q_div = row.find("div", class_="queueType")
-                    if q_div:
-                        t = q_div.text.strip()
-                        if "Ranked Solo" in t: queue_mode = "Solo/Duo"
-                        elif "Ranked Flex" in t: queue_mode = "Flex"
-                        else: queue_mode = t.split()[0] # İlk kelimeyi al
+                    # Eğer hala bulamadıysa, satırın metin içeriğine son kez bak
+                    text_content = row.text.strip().lower()
+                    if "solo" in text_content: queue_mode = "Solo/Duo"
+                    elif "flex" in text_content: queue_mode = "Flex"
 
                 # --- 2. ŞAMPİYON ---
                 champ_key = "Poro"
@@ -130,7 +127,7 @@ def scrape_summoner(url):
 
                 # --- 4. VERİLER ---
                 kda_text = kda_div.text.strip()
-                result = "win" if "Victory" in full_text or "Zafer" in full_text else "lose"
+                result = "win" if "Victory" in row.text or "Zafer" in row.text else "lose"
 
                 nums = re.findall(r"(\d+)", kda_text)
                 kda_display = "Perfect"
@@ -150,13 +147,13 @@ def scrape_summoner(url):
                     m = re.search(r"(\d+)", cs_div.text)
                     if m: cs_val = int(m.group(1))
                 else:
-                    m = re.search(r"(\d+)\s*CS", full_text, re.IGNORECASE)
+                    m = re.search(r"(\d+)\s*CS", row.text, re.IGNORECASE)
                     if m: cs_val = int(m.group(1))
                 cs_stat = f"{cs_val} CS"
 
                 # LP
                 lp_text = ""
-                lp_match = re.search(r"([+-]\d+)\s*LP", full_text)
+                lp_match = re.search(r"([+-]\d+)\s*LP", row.text)
                 if lp_match: lp_text = f"{lp_match.group(1)} LP"
 
                 matches_info.append({
@@ -167,7 +164,7 @@ def scrape_summoner(url):
                     "items": clean_items,
                     "grade": grade,
                     "cs": cs_stat,
-                    "queue_mode": queue_mode, # Artık doğru yazacak
+                    "queue_mode": queue_mode,
                     "lp_change": lp_text,
                     "kda_score": kda_display
                 })
